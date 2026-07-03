@@ -13,4 +13,6 @@ public interface UrlRepository extends JpaRepository<Url, Long> {
 
     boolean existsByShortCode(String shortCode);
 
+    Optional<Url> findByLongUrl(String longUrl);
+
 }
