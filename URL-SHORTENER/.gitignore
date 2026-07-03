@@ -1,0 +1,64 @@
+### Java ###
+*.class
+*.jar
+*.war
+*.ear
+
+### Build ###
+target/
+build/
+bin/
+out/
+*.zip
+*.tar.gz
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+### Gradle ###
+.gradle/
+build/
+
+### IDE ###
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.project
+.classpath
+*.prefs
+.factorypath
+
+### OS ###
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+### Logs ###
+*.log
+log/
+
+### Env & Secrets ###
+.env
+.env.local
+.env.*.local
+application-local.properties
+application-local.yml
+application-dev.properties
+application-dev.yml
+*.p12
+*.jks
+
+### Spring Boot ###
+!/src/main/resources/application.properties
+!/src/main/resources/application.yml
