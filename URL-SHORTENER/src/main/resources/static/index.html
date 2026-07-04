@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+            background: #ece0d1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card {
+            background: #dbc1ac;
+            border-radius: 16px;
+            padding: 48px;
+            width: 540px;
+            box-shadow: 0 8px 32px rgba(56,34,15,0.15);
+        }
+        h1 {
+            color: #38220f;
+            font-size: 26px;
+            font-weight: 500;
+            margin-bottom: 28px;
+            letter-spacing: -0.5px;
+        }
+        .input-group {
+            display: flex;
+            gap: 8px;
+        }
+        input {
+            flex: 1;
+            padding: 14px 18px;
+            border: 1px solid #967259;
+            border-radius: 10px;
+            font-size: 15px;
+            background: #ece0d1;
+            color: #38220f;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input::placeholder { color: #967259; }
+        input:focus { border-color: #634832; }
+        button {
+            padding: 14px 22px;
+            background: #634832;
+            color: #ece0d1;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        button:hover { background: #38220f; }
+        button:disabled {
+            background: #967259;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 24px;
+            display: none;
+        }
+        .result.show { display: flex; }
+        .result a {
+            flex: 1;
+            display: block;
+            padding: 14px 18px;
+            background: #ece0d1;
+            border: 1px solid #967259;
+            border-radius: 10px;
+            color: #634832;
+            text-decoration: none;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .result a:hover { text-decoration: underline; }
+        .result button {
+            padding: 14px 18px;
+            background: #967259;
+            color: #ece0d1;
+            font-size: 14px;
+        }
+        .result button:hover { background: #634832; }
+        .result button.copied { background: #634832; }
+        .error {
+            margin-top: 14px;
+            color: #634832;
+            font-size: 14px;
+            display: none;
+        }
+        .error.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>URL Shortener</h1>
+        <div class="input-group">
+            <input type="url" id="urlInput" placeholder="Enter your long URL..." autofocus>
+            <button id="shortenBtn">Shorten</button>
+        </div>
+        <div class="error" id="errorMsg"></div>
+        <div class="result" id="result">
+            <a id="shortLink" href="#" target="_blank"></a>
+            <button id="copyBtn">Copy</button>
+        </div>
+    </div>
+
+    <script>
+        const urlInput = document.getElementById('urlInput');
+        const shortenBtn = document.getElementById('shortenBtn');
+        const result = document.getElementById('result');
+        const shortLink = document.getElementById('shortLink');
+        const copyBtn = document.getElementById('copyBtn');
+        const errorMsg = document.getElementById('errorMsg');
+
+        shortenBtn.addEventListener('click', async () => {
+            const longUrl = urlInput.value.trim();
+            if (!longUrl) return;
+
+            shortenBtn.disabled = true;
+            shortenBtn.textContent = 'Shortening...';
+            result.classList.remove('show');
+            errorMsg.classList.remove('show');
+
+            try {
+                const res = await fetch('/shorten', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ longUrl })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    errorMsg.textContent = data.error || 'Something went wrong';
+                    errorMsg.classList.add('show');
+                    return;
+                }
+
+                shortLink.textContent = data.shortUrl;
+                shortLink.href = data.shortUrl;
+                result.classList.add('show');
+            } catch (err) {
+                errorMsg.textContent = 'Network error — is the server running?';
+                errorMsg.classList.add('show');
+            } finally {
+                shortenBtn.disabled = false;
+                shortenBtn.textContent = 'Shorten';
+            }
+        });
+
+        urlInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') shortenBtn.click();
+        });
+
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(shortLink.href);
+                copyBtn.textContent = 'Copied!';
+                copyBtn.classList.add('copied');
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy';
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            } catch {
+                errorMsg.textContent = 'Failed to copy';
+                errorMsg.classList.add('show');
+            }
+        });
+    </script>
+</body>
+</html>
