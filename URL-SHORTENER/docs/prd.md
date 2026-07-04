@@ -238,6 +238,7 @@ java -jar target/url-shortener-0.0.1-SNAPSHOT.jar
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `HEAD` | `/ping` | Health check (returns 200 OK) |
 | `POST` | `/shorten` | Create a shortened URL |
 | `GET` | `/{shortCode}` | Redirect to the original URL |
 | `GET` | `/swagger-ui.html` | Swagger UI (interactive API docs) |
