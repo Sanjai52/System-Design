@@ -59,6 +59,9 @@ application-dev.yml
 *.p12
 *.jks
 
+### Data ###
+data/
+
 ### Spring Boot ###
 !/src/main/resources/application.properties
 !/src/main/resources/application.yml
