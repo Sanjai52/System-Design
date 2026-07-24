@@ -3,24 +3,24 @@ package com.urlshortener.service;
 import com.urlshortener.model.Url;
 import com.urlshortener.repository.UrlRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class UrlService {
 
+    private static final Logger log = LoggerFactory.getLogger(UrlService.class);
+
     private final UrlRepository urlRepository;
     private final HashService hashService;
-    private final StringRedisTemplate redisTemplate;
-
-    private static final long CACHE_TTL_HOURS = 24;
 
     public Url createShortUrl(String longUrl) {
-        return urlRepository.findByLongUrl(longUrl)
+        long start = System.nanoTime();
+        Url result = urlRepository.findByLongUrl(longUrl)
                 .orElseGet(() -> {
                     String shortCode = generateUniqueShortCode(longUrl);
                     Url url = Url.builder()
@@ -28,23 +28,23 @@ public class UrlService {
                             .longUrl(longUrl)
                             .createdAt(LocalDateTime.now())
                             .build();
-                    Url saved = urlRepository.save(url);
-                    redisTemplate.opsForValue().set(shortCode, longUrl, CACHE_TTL_HOURS, TimeUnit.HOURS);
-                    return saved;
+                    return urlRepository.save(url);
                 });
+        long elapsed = System.nanoTime() - start;
+        log.info("createShortUrl(longUrl={}) -> shortCode={} | DB time: {} ms",
+                longUrl, result.getShortCode(), String.format("%.3f", elapsed / 1_000_000.0));
+        return result;
     }
 
     public String getOriginalUrl(String shortCode) {
-        String cachedUrl = redisTemplate.opsForValue().get(shortCode);
-        if (cachedUrl != null) {
-            return cachedUrl;
-        }
-        return urlRepository.findByShortCode(shortCode)
-                .map(url -> {
-                    redisTemplate.opsForValue().set(shortCode, url.getLongUrl(), CACHE_TTL_HOURS, TimeUnit.HOURS);
-                    return url.getLongUrl();
-                })
+        long start = System.nanoTime();
+        String longUrl = urlRepository.findByShortCode(shortCode)
+                .map(Url::getLongUrl)
                 .orElse(null);
+        long elapsed = System.nanoTime() - start;
+        log.info("getOriginalUrl(shortCode={}) -> {} | DB time: {} ms",
+                shortCode, longUrl != null ? "HIT" : "MISS", String.format("%.3f", elapsed / 1_000_000.0));
+        return longUrl;
     }
 
     private String generateUniqueShortCode(String longUrl) {
