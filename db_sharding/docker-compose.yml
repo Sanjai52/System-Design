@@ -1,0 +1,46 @@
+services:
+  configsvr:
+    image: mongo:7.0
+    command: mongod --configsvr --replSet configrs --port 27017 --dbpath /data/db
+    ports:
+      - 27019:27017
+    volumes:
+      - ./data/configsvr:/data/db
+    networks:
+      - shard-net
+
+  shard1:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard1rs --port 27017 --dbpath /data/db
+    ports:
+      - 27020:27017
+    volumes:
+      - ./data/shard1:/data/db
+    networks:
+      - shard-net
+
+  shard2:
+    image: mongo:7.0
+    command: mongod --shardsvr --replSet shard2rs --port 27017 --dbpath /data/db
+    ports:
+      - 27021:27017
+    volumes:
+      - ./data/shard2:/data/db
+    networks:
+      - shard-net
+
+  mongos:
+    image: mongo:7.0
+    command: mongos --configdb configrs/configsvr:27017 --port 27017 --bind_ip_all
+    ports:
+      - 27017:27017
+    depends_on:
+      - configsvr
+      - shard1
+      - shard2
+    networks:
+      - shard-net
+
+networks:
+  shard-net:
+    driver: bridge
