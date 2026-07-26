@@ -14,9 +14,13 @@ until docker compose exec -T configsvr mongosh --quiet --port 27017 --eval "db.r
 done
 
 echo "=== Init config server replica set ==="
-docker compose exec -T configsvr mongosh --quiet --port 27017 /scripts/init-config.js
+for i in $(seq 1 10); do
+  docker compose exec -T configsvr mongosh --quiet --port 27017 /scripts/init-config.js 2>/dev/null && break
+  echo "  retrying configsvr init in 3s... (attempt $i)"
+  sleep 3
+done
 
-echo "=== Waiting for config replica set to elect primary ==="
+echo "=== Waiting for config replica set primary ==="
 sleep 5
 
 echo "=== Init shard1 replica set ==="
@@ -33,6 +37,8 @@ until docker compose exec -T mongos mongosh --quiet --port 27017 --eval "db.runC
   echo "  waiting for mongos..."
   sleep 2
 done
+
+echo "=== Configuring sharding via mongos ==="
 docker compose exec -T mongos mongosh --quiet --port 27017 /scripts/shard-cluster.js
 
 echo "=== Waiting for sharding to take effect ==="
