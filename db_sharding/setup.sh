@@ -29,6 +29,12 @@ echo "=== Inserting seed data ==="
 docker compose exec -T mongos mongosh --quiet --port 27017 /scripts/seed-data.js
 
 echo "=== Verifying sharding ==="
-docker compose exec -T mongos mongosh --quiet --port 27017 /scripts/verify-sharding.js
+docker compose exec -T mongos mongosh --quiet --port 27017 --eval "
+db = db.getSiblingDB('College')
+print('=== Shard Status ===')
+sh.status()
+print('\n=== Shard Distribution ===')
+db.Student.getShardDistribution()
+"
 
 echo "=== Done ==="

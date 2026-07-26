@@ -6,6 +6,7 @@ services:
       - 27019:27017
     volumes:
       - ./data/configsvr:/data/db
+      - ./scripts:/scripts
     networks:
       - shard-net
 
@@ -16,6 +17,7 @@ services:
       - 27020:27017
     volumes:
       - ./data/shard1:/data/db
+      - ./scripts:/scripts
     networks:
       - shard-net
 
@@ -26,6 +28,7 @@ services:
       - 27021:27017
     volumes:
       - ./data/shard2:/data/db
+      - ./scripts:/scripts
     networks:
       - shard-net
 
@@ -34,6 +37,8 @@ services:
     command: mongos --configdb configrs/configsvr:27017 --port 27017 --bind_ip_all
     ports:
       - 27017:27017
+    volumes:
+      - ./scripts:/scripts
     depends_on:
       - configsvr
       - shard1
