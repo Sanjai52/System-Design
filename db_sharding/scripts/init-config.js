@@ -1,10 +1,11 @@
-var status
+var initialized = false
 try {
-  status = rs.status()
+  var s = rs.status()
+  initialized = s.ok === 1
 } catch(e) {
-  status = { codeName: "NotYetInitialized" }
+  initialized = e.codeName === "AlreadyInitialized"
 }
-if (status.codeName !== "AlreadyInitialized") {
+if (!initialized) {
   rs.initiate({
     _id: "configrs",
     configsvr: true,
