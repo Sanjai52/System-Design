@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consistent Hashing — Shard Visualizer</title>
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--green:#4ade80;--red:#f87171}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;padding:24px;max-width:1200px;margin:0 auto}
+header{margin-bottom:20px}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:baseline}
+h1{font-size:20px;font-weight:700}
+.sub{color:var(--muted);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{display:flex;align-items:center;gap:6px;font-size:12px;background:var(--card);padding:4px 10px;border-radius:999px;border:1px solid var(--border)}
+.chip .dot{width:10px;height:10px;border-radius:50%;flex:none}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+button{background:#2563eb;border:none;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer}
+button:hover{filter:brightness(1.15)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.danger{background:#b91c1c}
+button.ghost{background:#334155}
+select,input{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:8px;font-size:13px}
+label.toggle{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer}
+.status{width:100%;color:var(--muted);font-size:13px;min-height:20px;margin-top:10px}
+.status.err{color:var(--red)}
+.grid{display:grid;grid-template-columns:minmax(380px,1.05fr) 1fr;gap:16px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card h2{font-size:12px;font-weight:700;margin-bottom:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.ring-wrap{display:flex;flex-direction:column;align-items:center}
+#ring{width:100%;max-width:430px}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;justify-content:center}
+.bar-row{display:grid;grid-template-columns:110px 1fr 140px;gap:12px;align-items:center;margin-bottom:10px;font-size:13px}
+.bar-track{background:var(--bg);border-radius:6px;height:22px;overflow:hidden}
+.bar-fill{height:100%;border-radius:6px;transition:width .8s ease}
+.bar-label{display:flex;align-items:center;gap:8px;font-weight:600}
+.bar-stat{color:var(--muted);text-align:right;white-space:nowrap}
+.delta-up{color:var(--green);font-weight:700}
+.delta-down{color:var(--red);font-weight:700}
+.hist-item{font-size:13px;border-top:1px solid var(--border);padding:10px 0}
+.hist-item:first-child{border-top:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;margin-right:8px}
+.badge.add{background:#14532d;color:#4ade80}
+.badge.remove{background:#7f1d1d;color:#f87171}
+.before-after{display:flex;flex-direction:column;gap:2px;margin-top:6px;color:var(--muted);font-size:12px}
+.before-after b{color:var(--text)}
+.lookup{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+#lookupResult{margin-top:10px;font-size:13px;min-height:20px}
+.key-marker{pointer-events:none}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <h1>Consistent Hashing — Shard Visualizer</h1>
+    <span class="sub">Student records routed by SHA-256 over <code>student:&lt;rollNo&gt;</code></span>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="controls">
+    <button id="seedBtn" class="ghost">Re-seed 10,000</button>
+    <select id="addSel" aria-label="node to add"></select>
+    <button id="addBtn">+ Add Shard</button>
+    <select id="removeSel" aria-label="node to remove"></select>
+    <button id="removeBtn" class="danger">− Remove Shard</button>
+    <label class="toggle"><input type="checkbox" id="autoRefresh" checked> auto refresh</label>
+  </div>
+  <div class="status" id="status"></div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card">
+      <h2>Hash Ring (virtual nodes)</h2>
+      <div class="ring-wrap">
+        <svg id="ring" viewBox="0 0 520 520"></svg>
+        <div class="legend" id="legend"></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Data Distribution</h2>
+      <div id="bars"></div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Migration History</h2>
+      <div id="history"><div style="color:var(--muted);font-size:13px">No migrations yet — add or remove a shard.</div></div>
+    </section>
+    <section class="card">
+      <h2>Locate a Student</h2>
+      <div class="lookup">
+        <input id="rollNo" type="number" min="1" placeholder="RollNo, e.g. 5000">
+        <button id="lookupBtn">Locate</button>
+      </div>
+      <div id="lookupResult"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const NODE_COLORS = ["#4e79a7","#f28e2b","#59a14f","#e15759","#b07aa1","#76b7b2","#edc948","#ff9da7","#9c755f","#bab0ac"];
+const KNOWN_NODES = [
+  {id:"node1", host:"localhost", port:27030},
+  {id:"node2", host:"localhost", port:27031},
+  {id:"node3", host:"localhost", port:27032},
+  {id:"node4", host:"localhost", port:27033},
+];
+const RING_GEOM = {W:520, H:520, cx:260, cy:260, R:205};
+
+let dist = null, ring = null, prev = null, busy = false, timer = null;
+
+const $ = id => document.getElementById(id);
+
+function colorOf(id) {
+  const idx = parseInt(id.replace(/\D/g, ""), 10) - 1;
+  return NODE_COLORS[(idx >= 0 ? idx : id.length) % NODE_COLORS.length];
+}
+
+async function api(path, opts) {
+  const res = await fetch("/api/admin" + path, opts);
+  if (!res.ok) {
+    let msg = res.statusText;
+    try { msg = (await res.json()).error || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function setStatus(text, isErr) {
+  const el = $("status");
+  el.textContent = text || "";
+  el.className = "status" + (isErr ? " err" : "");
+}
+
+function setBusy(b) {
+  busy = b;
+  ["seedBtn","addBtn","removeBtn","lookupBtn"].forEach(id => $(id).disabled = b);
+  $("addSel").disabled = b;
+  $("removeSel").disabled = b;
+}
+
+async function loadAll() {
+  try {
+    const [d, r] = await Promise.all([api("/distribution"), api("/ring")]);
+    dist = d;
+    ring = r;
+    renderChips();
+    renderBars();
+    renderRing();
+    renderControls();
+  } catch (e) {
+    setStatus("Refresh failed: " + e.message, true);
+  }
+}
+
+function renderChips() {
+  if (!dist) return;
+  $("chips").innerHTML = [
+    `<span class="chip">records <b>${dist.total.toLocaleString()}</b></span>`,
+    `<span class="chip">storage nodes <b>${dist.nodes.length}</b></span>`,
+    `<span class="chip">virtual nodes/node <b>${ring ? ring.virtualNodesPerNode : "-"}</b></span>`,
+    `<span class="chip">ring points <b>${ring ? ring.totalVirtualPoints : "-"}</b></span>`,
+    `<span class="chip">hash <b>SHA-256</b></span>`,
+  ].join("");
+}
+
+function renderBars() {
+  if (!dist) return;
+  const max = Math.max(...dist.nodes.map(n => n.count), 1);
+  $("bars").innerHTML = dist.nodes.map(n => {
+    const width = (n.count / max * 100).toFixed(1);
+    let deltaHtml = "";
+    if (prev) {
+      const before = prev.nodes.find(p => p.nodeId === n.nodeId);
+      if (before) {
+        const delta = n.count - before.count;
+        if (delta !== 0) {
+          const cls = delta > 0 ? "delta-up" : "delta-down";
+          deltaHtml = `<span class="${cls}">${delta > 0 ? "+" : ""}${delta.toLocaleString()}</span>`;
+        }
+      }
+    }
+    return `
+      <div class="bar-row">
+        <div class="bar-label"><span class="dot" style="background:${colorOf(n.nodeId)}"></span>${n.nodeId}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${colorOf(n.nodeId)}"></div></div>
+        <div class="bar-stat">${n.count.toLocaleString()} (${n.percentage}%) ${deltaHtml}</div>
+      </div>`;
+  }).join("");
+}
+
+function renderRing() {
+  const svg = $("ring");
+  const {W, H, cx, cy, R} = RING_GEOM;
+  let dots = "";
+  if (ring) {
+    for (const p of ring.points) {
+      const a = p.position * 2 * Math.PI - Math.PI / 2;
+      const x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
+      dots += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${colorOf(p.nodeId)}" opacity="0.8"/>`;
+    }
+  }
+  svg.innerHTML = `
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#334155" stroke-width="2"/>
+    ${dots}
+    <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#e2e8f0" font-size="17" font-weight="700">${ring ? ring.totalVirtualPoints : ""}</text>
+    <text x="${cx}" y="${cy + 16}" text-anchor="middle" fill="#94a3b8" font-size="12">virtual points on ring</text>
+    <g id="keyMarker" class="key-marker" style="display:none">
+      <circle r="15" fill="none" stroke="#fbbf24" stroke-width="3"/>
+      <line x1="-20" y1="0" x2="20" y2="0" stroke="#fbbf24" stroke-width="1.5"/>
+      <line x1="0" y1="-20" x2="0" y2="20" stroke="#fbbf24" stroke-width="1.5"/>
+    </g>`;
+  $("legend").innerHTML = ring.nodes.map(id =>
+    `<span class="chip"><span class="dot" style="background:${colorOf(id)}"></span>${id} · ${ring.perNodePoints[id]} pts</span>`).join("");
+}
+
+function renderControls() {
+  if (!ring) return;
+  const registered = new Set(ring.nodes);
+  const addable = KNOWN_NODES.filter(n => !registered.has(n.id));
+  $("addSel").innerHTML = addable.length
+    ? addable.map(n => `<option value="${n.id}">${n.id} (${n.host}:${n.port})</option>`).join("")
+    : `<option value="">all nodes registered</option>`;
+  $("addBtn").disabled = busy || addable.length === 0;
+  $("removeSel").innerHTML = ring.nodes.map(id => {
+    const n = KNOWN_NODES.find(k => k.id === id);
+    return `<option value="${id}">${id}${n ? ` (${n.host}:${n.port})` : ""}</option>`;
+  }).join("");
+  $("removeBtn").disabled = busy || ring.nodes.length <= 1;
+}
+
+function pushHistory(res, seconds) {
+  const before = prev ? Object.fromEntries(prev.nodes.map(n => [n.nodeId, n.count])) : null;
+  const after = Object.fromEntries(res.distribution.nodes.map(n => [n.nodeId, n.count]));
+  const nodeIds = [...new Set([...(before ? Object.keys(before) : []), ...Object.keys(after)])].sort();
+  const fmt = map => nodeIds.map(id => `${id}: ${map[id] !== undefined ? map[id].toLocaleString() : "-"}`).join(" · ");
+  const row = document.createElement("div");
+  row.className = "hist-item";
+  row.innerHTML = `
+    <span class="badge ${res.action === "ADD" ? "add" : "remove"}">${res.action}</span>
+    <b>${res.nodeId}</b> — migrated <b>${res.recordsMigrated.toLocaleString()}</b> records in ${seconds}s
+    <div class="before-after">
+      <span>before: ${before ? fmt(before) : "-"}</span>
+      <span>after: ${fmt(after)}</span>
+    </div>`;
+  $("history").prepend(row);
+}
+
+async function addShard() {
+  const id = $("addSel").value;
+  if (!id) return;
+  const node = KNOWN_NODES.find(n => n.id === id);
+  setBusy(true);
+  setStatus(`Starting ${node.id} container and adding to ring…`);
+  try {
+    prev = dist;
+    const t0 = performance.now();
+    const res = await api("/nodes", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({id: node.id, host: node.host, port: node.port}),
+    });
+    const seconds = ((performance.now() - t0) / 1000).toFixed(1);
+    pushHistory(res, seconds);
+    dist = res.distribution;
+    ring = null;
+    await loadAll();
+    setStatus(`Shard ${node.id} added — ${res.recordsMigrated.toLocaleString()} records migrated (${seconds}s)`);
+  } catch (e) {
+    setStatus("Add failed: " + e.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function removeShard() {
+  const id = $("removeSel").value;
+  if (!id) return;
+  setBusy(true);
+  setStatus(`Removing ${id} from ring and redistributing its records…`);
+  try {
+    prev = dist;
+    const t0 = performance.now();
+    const res = await api("/nodes/" + encodeURIComponent(id), {method: "DELETE"});
+    const seconds = ((performance.now() - t0) / 1000).toFixed(1);
+    pushHistory(res, seconds);
+    dist = res.distribution;
+    ring = null;
+    await loadAll();
+    setStatus(`Shard ${id} removed — ${res.recordsMigrated.toLocaleString()} records redistributed (${seconds}s)`);
+  } catch (e) {
+    setStatus("Remove failed: " + e.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function seed() {
+  if (!confirm("Wipe all storage nodes and re-seed 10,000 students?")) return;
+  setBusy(true);
+  setStatus("Seeding 10,000 students through the hash ring…");
+  try {
+    prev = null;
+    dist = await api("/seed?count=10000");
+    await loadAll();
+    setStatus("Seeded 10,000 students.");
+  } catch (e) {
+    setStatus("Seed failed: " + e.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function hashPosition(rollNo) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("student:" + rollNo));
+  let value = 0n;
+  for (const byte of new Uint8Array(digest)) value = (value << 8n) | BigInt(byte);
+  return Number(value) / Number(1n << 256n);
+}
+
+function drawMarker(pos) {
+  const svg = $("ring");
+  const marker = svg.querySelector("#keyMarker");
+  if (!marker) return;
+  const {cx, cy, R} = RING_GEOM;
+  const a = pos * 2 * Math.PI - Math.PI / 2;
+  marker.setAttribute("transform", `translate(${cx + R * Math.cos(a)}, ${cy + R * Math.sin(a)})`);
+  marker.style.display = "block";
+}
+
+async function lookup() {
+  const rollNo = parseInt($("rollNo").value, 10);
+  if (!rollNo) {
+    setStatus("Enter a RollNo to locate.", true);
+    return;
+  }
+  setBusy(true);
+  setStatus("Locating rollNo " + rollNo + "…");
+  try {
+    const pos = await hashPosition(rollNo);
+    drawMarker(pos);
+    const predicted = ring && ring.points.length
+      ? (ring.points.find(p => p.position >= pos) || ring.points[0]).nodeId
+      : null;
+    const res = await fetch("/api/students/" + rollNo);
+    let actual = null, name = "";
+    if (res.ok) {
+      const student = await res.json();
+      actual = student.shard;
+      name = ` (${student.name})`;
+    }
+    const verdict = actual
+      ? `<span class="chip"><span class="dot" style="background:${colorOf(actual)}"></span>stored on <b>&nbsp;${actual}</b></span>` +
+        (predicted && predicted === actual ? ` — matches clockwise ring prediction` : ` — ring prediction: ${predicted}`)
+      : `<span style="color:var(--red)">not found on any node</span>`;
+    $("lookupResult").innerHTML =
+      `RollNo <b>${rollNo}</b>${name} → ring position ${pos.toFixed(4)} → ${verdict}`;
+    setStatus("");
+  } catch (e) {
+    setStatus("Lookup failed: " + e.message, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+$("addBtn").addEventListener("click", addShard);
+$("removeBtn").addEventListener("click", removeShard);
+$("seedBtn").addEventListener("click", seed);
+$("lookupBtn").addEventListener("click", lookup);
+$("rollNo").addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });
+$("autoRefresh").addEventListener("change", () => {
+  clearInterval(timer);
+  if ($("autoRefresh").checked) timer = setInterval(() => { if (!busy) loadAll(); }, 3000);
+});
+
+loadAll();
+timer = setInterval(() => { if (!busy && $("autoRefresh").checked) loadAll(); }, 3000);
+</script>
+</body>
+</html>
