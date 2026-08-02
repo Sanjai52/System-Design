@@ -1,0 +1,123 @@
+services:
+  mongo1:
+    image: mongo:7.0
+    command: ["mongod", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27017:27017
+    volumes:
+      - ./mongo-data/mongo1:/data/db
+    restart: unless-stopped
+    networks:
+      - ch-net
+
+  mongo2:
+    image: mongo:7.0
+    command: ["mongod", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27018:27017
+    volumes:
+      - ./mongo-data/mongo2:/data/db
+    restart: unless-stopped
+    networks:
+      - ch-net
+
+  mongo3:
+    image: mongo:7.0
+    command: ["mongod", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27019:27017
+    volumes:
+      - ./mongo-data/mongo3:/data/db
+    restart: unless-stopped
+    networks:
+      - ch-net
+
+  # Fourth node is pre-provisioned so the "add node" demo is a one-command
+  # operation: register it on the ring (mongo4:27020) without starting a new
+  # container. It is NOT registered on the hash ring by the app initially.
+  mongo4:
+    image: mongo:7.0
+    command: ["mongod", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - 27020:27017
+    volumes:
+      - ./mongo-data/mongo4:/data/db
+    restart: unless-stopped
+    networks:
+      - ch-net
+
+  mongo-express-1:
+    image: mongo-express:1.0
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo1:27017/?directConnection=true
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongo1
+    networks:
+      - ch-net
+
+  mongo-express-2:
+    image: mongo-express:1.0
+    ports:
+      - 8082:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo2:27017/?directConnection=true
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongo2
+    networks:
+      - ch-net
+
+  mongo-express-3:
+    image: mongo-express:1.0
+    ports:
+      - 8083:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo3:27017/?directConnection=true
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongo3
+    networks:
+      - ch-net
+
+  mongo-express-4:
+    image: mongo-express:1.0
+    ports:
+      - 8084:8081
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://mongo4:27017/?directConnection=true
+      ME_CONFIG_MONGODB_ENABLE_ADMIN: "true"
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    depends_on:
+      - mongo4
+    networks:
+      - ch-net
+
+  # --- Optional: run the Spring Boot app in Docker (self-contained demo) ---
+  # Build: docker compose up --build -d
+  # When running the app in Docker, override APP_NODES to use Docker service names.
+  app:
+    build: .
+    ports:
+      - 8080:8080
+    environment:
+      APP_NODES: mongo1:27017,mongo2:27017,mongo3:27017
+    depends_on:
+      - mongo1
+      - mongo2
+      - mongo3
+    networks:
+      - ch-net
+
+networks:
+  ch-net:
+    driver: bridge

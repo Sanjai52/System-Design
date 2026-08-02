@@ -1,0 +1,12 @@
+target/
+*.class
+.env
+
+# IDE / Eclipse metadata
+.classpath
+.project
+.factorypath
+.settings/
+
+# Docker bind-mount data
+mongo-data/

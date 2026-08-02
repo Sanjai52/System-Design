@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consistent Hashing - Student Store</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", serif;
+            background: #ece0d1;
+            color: #38220f;
+            padding: 32px;
+            min-height: 100vh;
+        }
+        h1, h2 { font-weight: 500; letter-spacing: -0.5px; }
+        h1 { font-size: 26px; margin-bottom: 8px; }
+        .subtitle { color: #634832; font-size: 14px; margin-bottom: 28px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1100px; }
+        @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+        .card {
+            background: #dbc1ac;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px rgba(56,34,15,0.12);
+        }
+        .card h2 { font-size: 18px; margin-bottom: 16px; }
+        .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+        input, select {
+            flex: 1 1 140px;
+            padding: 10px 14px;
+            border: 1px solid #967259;
+            border-radius: 10px;
+            font-size: 14px;
+            background: #ece0d1;
+            color: #38220f;
+            outline: none;
+        }
+        input:focus { border-color: #634832; }
+        button {
+            padding: 10px 18px;
+            background: #634832;
+            color: #ece0d1;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #38220f; }
+        button:disabled { background: #967259; cursor: not-allowed; }
+        button.ghost { background: transparent; border: 1px solid #967259; }
+        button.ghost:hover { background: #634832; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #96725940; font-size: 14px; }
+        th { color: #634832; font-weight: 600; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .badge-new { background: #38220f; color: #ece0d1; }
+        .muted { color: #634832; font-size: 13px; }
+        .error { color: #a04040; font-size: 13px; margin-top: 8px; }
+        .stat { font-weight: 700; }
+    </style>
+</head>
+<body>
+<h1>Distributed Student Store (Consistent Hashing)</h1>
+<p class="subtitle">Records route to MongoDB storage nodes by hashing the student RollNo onto a virtual-node hash ring.</p>
+
+<div class="grid">
+    <div class="card">
+        <h2>Add Student</h2>
+        <div class="row">
+            <input id="sRollNo" placeholder="RollNo">
+            <input id="sName" placeholder="Name">
+            <input id="sDept" placeholder="Dept">
+            <input id="sYear" placeholder="Year" type="number" min="1" max="4">
+            <button id="addStudentBtn">Add</button>
+        </div>
+        <div class="error" id="studentError"></div>
+    </div>
+
+    <div class="card">
+        <h2>Add Storage Node</h2>
+        <div class="row">
+            <input id="nHost" placeholder="Host (e.g. mongo4)" value="mongo4">
+            <input id="nPort" placeholder="Port" type="number" value="27020">
+            <button id="addNodeBtn">Add Node</button>
+        </div>
+        <div class="error" id="nodeError"></div>
+    </div>
+</div>
+
+<div style="margin-top:24px; max-width:1100px;">
+    <div class="card" style="margin-bottom:24px;">
+        <h2>Storage Nodes <span class="muted">(active on ring)</span></h2>
+        <table id="nodesTable">
+            <thead><tr><th>Node</th><th>Virtual Nodes</th><th>Students</th><th>Action</th></tr></thead>
+            <tbody id="nodesBody"></tbody>
+        </table>
+        <p class="muted" style="margin-top:12px;">Vnodes per node: <span id="vnodesPerNode">150</span></p>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+        <h2>Data Distribution</h2>
+        <table id="distTable">
+            <thead><tr><th>Node</th><th>Records</th><th>Vnodes</th></tr></thead>
+            <tbody id="distBody"></tbody>
+        </table>
+        <p class="muted" style="margin-top:12px;">Total records: <span class="stat" id="totalRecords">0</span></p>
+    </div>
+
+    <div class="card">
+        <h2>Students <span class="muted">(click refresh after changes)</span></h2>
+        <button class="ghost" id="refreshStudents" style="margin-bottom:12px;">Refresh</button>
+        <table id="studentsTable">
+            <thead><tr><th>RollNo</th><th>Name</th><th>Dept</th><th>Year</th></tr></thead>
+            <tbody id="studentsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const api = "/api";
+
+    async function fetchJSON(url, opts = {}) {
+        const res = await fetch(url, { headers: { "Content-Type": "application/json" }, ...opts });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({ error: res.statusText }));
+            throw new Error(data.error || res.statusText);
+        }
+        return res.status === 204 ? null : res.json();
+    }
+
+    async function refreshAll() {
+        await Promise.all([refreshNodes(), refreshDistribution(), refreshStudents()]);
+    }
+
+    async function refreshNodes() {
+        const nodes = await fetchJSON(api + "/nodes");
+        const vnodes = await fetchJSON(api + "/nodes/ring");
+        const dist = await fetchJSON(api + "/distribution/counts");
+        const body = document.getElementById("nodesBody");
+        body.innerHTML = "";
+        const firstVnode = Object.values(vnodes)[0];
+        document.getElementById("vnodesPerNode").textContent = firstVnode != null ? firstVnode : 0;
+        nodes.forEach(n => {
+            const tr = document.createElement("tr");
+            const key = n.host + ":" + n.port;
+            tr.innerHTML = `<td>${key}</td>
+                <td>${vnodes[key] || 0}</td>
+                <td>${dist[key] || 0}</td>
+                <td><button class="ghost" onclick="removeNode('${n.host}', ${n.port})">Remove</button></td>`;
+            body.appendChild(tr);
+        });
+    }
+
+    window.removeNode = async function (host, port) {
+        try {
+            await fetchJSON(api + "/nodes/" + host + "/" + port, { method: "DELETE" });
+            await refreshAll();
+        } catch (e) { document.getElementById("nodeError").textContent = e.message; }
+    }
+
+    document.getElementById("addNodeBtn").addEventListener("click", async () => {
+        const host = document.getElementById("nHost").value.trim();
+        const port = parseInt(document.getElementById("nPort").value);
+        if (!host) return;
+        try {
+            await fetchJSON(api + "/nodes", { method: "POST", body: JSON.stringify({ host, port }) });
+            document.getElementById("nodeError").textContent = "";
+            await refreshAll();
+        } catch (e) { document.getElementById("nodeError").textContent = e.message; }
+    });
+
+    document.getElementById("addStudentBtn").addEventListener("click", async () => {
+        const rollNo = parseInt(document.getElementById("sRollNo").value);
+        const name = document.getElementById("sName").value.trim();
+        const dept = document.getElementById("sDept").value.trim();
+        const year = parseInt(document.getElementById("sYear").value);
+        if (!rollNo || !name || !dept) return;
+        try {
+            await fetchJSON(api + "/students", {
+                method: "POST",
+                body: JSON.stringify({ rollNo, name, dept, year })
+            });
+            document.getElementById("studentError").textContent = "";
+            document.getElementById("sRollNo").value = "";
+            document.getElementById("sName").value = "";
+            document.getElementById("sDept").value = "";
+            document.getElementById("sYear").value = "";
+            await refreshAll();
+        } catch (e) { document.getElementById("studentError").textContent = e.message; }
+    });
+
+    async function refreshDistribution() {
+        const report = await fetchJSON(api + "/distribution");
+        const body = document.getElementById("distBody");
+        body.innerHTML = "";
+        const counts = report.counts;
+        const vnodes = report.vnodes;
+        Object.keys(counts).forEach(key => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${key}</td><td class="stat">${counts[key]}</td><td>${vnodes[key] || 0}</td>`;
+            body.appendChild(tr);
+        });
+        document.getElementById("totalRecords").textContent = report.total;
+    }
+
+    async function refreshStudents() {
+        const list = await fetchJSON(api + "/students");
+        const body = document.getElementById("studentsBody");
+        body.innerHTML = "";
+        list.forEach(s => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td>${s.rollNo}</td><td>${s.name}</td><td>${s.dept}</td><td>${s.year}</td>`;
+            body.appendChild(tr);
+        });
+    }
+
+    document.getElementById("refreshStudents").addEventListener("click", refreshStudents);
+
+    refreshAll();
+    setInterval(refreshAll, 8000);
+</script>
+</body>
+</html>
