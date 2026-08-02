@@ -7,3 +7,6 @@ target/
 .project
 .factorypath
 .settings/
+
+# Docker bind-mount data
+mongo-data/

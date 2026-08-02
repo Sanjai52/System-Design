@@ -5,7 +5,7 @@ services:
     ports:
       - 27017:27017
     volumes:
-      - mongo1-data:/data/db
+      - ./mongo-data/mongo1:/data/db
     restart: unless-stopped
     networks:
       - ch-net
@@ -16,7 +16,7 @@ services:
     ports:
       - 27018:27017
     volumes:
-      - mongo2-data:/data/db
+      - ./mongo-data/mongo2:/data/db
     restart: unless-stopped
     networks:
       - ch-net
@@ -27,7 +27,7 @@ services:
     ports:
       - 27019:27017
     volumes:
-      - mongo3-data:/data/db
+      - ./mongo-data/mongo3:/data/db
     restart: unless-stopped
     networks:
       - ch-net
@@ -41,7 +41,7 @@ services:
     ports:
       - 27020:27017
     volumes:
-      - mongo4-data:/data/db
+      - ./mongo-data/mongo4:/data/db
     restart: unless-stopped
     networks:
       - ch-net
@@ -117,12 +117,6 @@ services:
       - mongo3
     networks:
       - ch-net
-
-volumes:
-  mongo1-data:
-  mongo2-data:
-  mongo3-data:
-  mongo4-data:
 
 networks:
   ch-net:

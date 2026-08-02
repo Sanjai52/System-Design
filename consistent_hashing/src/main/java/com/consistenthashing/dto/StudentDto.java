@@ -1,5 +1,6 @@
 package com.consistenthashing.dto;
 
+import com.consistenthashing.model.Student;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,7 +15,7 @@ public class StudentDto {
     private String dept;
     private int year;
 
-    public static StudentDto from(Long rollNo, String name, String dept, int year) {
-        return new StudentDto(rollNo, name, dept, year);
+    public static StudentDto from(Student student) {
+        return new StudentDto(student.getRollNo(), student.getName(), student.getDept(), student.getYear());
     }
 }
