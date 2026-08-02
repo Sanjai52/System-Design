@@ -1,0 +1,66 @@
+services:
+  node1:
+    image: mongo:7.0
+    container_name: ch-node1
+    command: mongod --port 27017 --dbpath /data/db
+    ports:
+      - 27030:27017
+    volumes:
+      - ./data/node1:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--port", "27017", "--eval", "db.runCommand({ping:1})"]
+      interval: 3s
+      retries: 20
+    networks:
+      - ch-net
+
+  node2:
+    image: mongo:7.0
+    container_name: ch-node2
+    command: mongod --port 27017 --dbpath /data/db
+    ports:
+      - 27031:27017
+    volumes:
+      - ./data/node2:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--port", "27017", "--eval", "db.runCommand({ping:1})"]
+      interval: 3s
+      retries: 20
+    networks:
+      - ch-net
+
+  node3:
+    image: mongo:7.0
+    container_name: ch-node3
+    command: mongod --port 27017 --dbpath /data/db
+    ports:
+      - 27032:27017
+    volumes:
+      - ./data/node3:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--port", "27017", "--eval", "db.runCommand({ping:1})"]
+      interval: 3s
+      retries: 20
+    networks:
+      - ch-net
+
+  node4:
+    image: mongo:7.0
+    container_name: ch-node4
+    command: mongod --port 27017 --dbpath /data/db
+    ports:
+      - 27033:27017
+    volumes:
+      - ./data/node4:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--port", "27017", "--eval", "db.runCommand({ping:1})"]
+      interval: 3s
+      retries: 20
+    networks:
+      - ch-net
+    profiles:
+      - extra
+
+networks:
+  ch-net:
+    driver: bridge
