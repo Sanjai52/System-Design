@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+export MSYS2_ARG_CONV_EXCL="*"
 
 echo "=== Starting containers ==="
 docker compose up -d
