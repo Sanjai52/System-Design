@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shard Visualizer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+header { text-align: center; padding: 1.5rem 1rem; border-bottom: 1px solid #1e293b; }
+header h1 { font-size: 1.3rem; color: #38bdf8; }
+header p { color: #64748b; font-size: 0.8rem; margin-top: 0.25rem; }
+
+.tabs { display: flex; gap: 0; background: #1e293b; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem; }
+.tab { flex: 1; padding: 0.6rem; text-align: center; cursor: pointer; font-size: 0.8rem; color: #64748b; border-bottom: 2px solid transparent; transition: all .2s; }
+.tab.active { color: #38bdf8; border-bottom-color: #38bdf8; background: #0f172a; }
+.tab:hover { color: #94a3b8; }
+
+.container { max-width: 1000px; margin: 0 auto; padding: 1rem; }
+
+.form-section { background: #1e293b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: end; }
+.form-section input, .form-section select {
+  background: #0f172a; border: 1px solid #334155; border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem; color: #e2e8f0; font-size: 0.8rem; outline: none;
+}
+.form-section input:focus, .form-section select:focus { border-color: #38bdf8; }
+.form-section input[name="RollNo"] { width: 100px; }
+.form-section input[name="Name"] { width: 120px; }
+.form-section input[name="Dept"] { width: 80px; }
+.form-section select { width: 70px; cursor: pointer; }
+.form-section button {
+  background: #38bdf8; color: #0f172a; border: none; border-radius: 0.4rem;
+  padding: 0.5rem 1rem; font-weight: 600; cursor: pointer; font-size: 0.8rem;
+}
+.form-section button:hover { opacity: 0.85; }
+.form-section button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#flowArrow { text-align: center; padding: 0.3rem; color: #38bdf8; font-size: 0.75rem; display: none; }
+#flowArrow.active { display: block; animation: pulse 0.5s ease 3; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.view-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+.shard-box { background: #1e293b; border-radius: 0.5rem; padding: 0.75rem; min-height: 150px; }
+.shard-box h3 { font-size: 0.8rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+.shard-box h3 .count { margin-left: auto; font-size: 0.7rem; color: #64748b; }
+.shard1-box { border-top: 3px solid #a78bfa; }
+.shard2-box { border-top: 3px solid #f97316; }
+.shard1-box h3 .dot { color: #a78bfa; }
+.shard2-box h3 .dot { color: #f97316; }
+.shard-content { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.s-card { background: #0f172a; border-radius: 0.3rem; padding: 0.25rem 0.4rem; font-size: 0.7rem; border-left: 2px solid transparent; animation: pop .3s ease-out; }
+.shard1-box .s-card { border-left-color: #a78bfa; }
+.shard2-box .s-card { border-left-color: #f97316; }
+.s-card .rn { color: #94a3b8; font-weight: 600; }
+@keyframes pop { 0% { transform: scale(.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+.mongos-box { background: #1e293b; border-radius: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; border-top: 3px solid #34d399; }
+.mongos-box h3 { font-size: 0.8rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+.mongos-box h3 .dot { color: #34d399; }
+.mongos-content { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.mongos-content .s-card { border-left-color: #34d399; }
+
+.bar-track { height: 1.5rem; background: #0f172a; border-radius: 0.75rem; overflow: hidden; display: flex; margin-bottom: 1rem; }
+.bar-seg { height: 100%; transition: width .5s ease; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 600; color: #0f172a; padding: 0 .5rem; }
+.bar-s1 { background: #a78bfa; }
+.bar-s2 { background: #f97316; }
+
+.bench-section { background: #1e293b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+.bench-section h3 { font-size: 0.85rem; margin-bottom: 0.75rem; }
+.bench-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.bench-card { background: #0f172a; border-radius: 0.4rem; padding: 0.75rem; }
+.bench-card .label { font-size: 0.7rem; color: #64748b; }
+.bench-card .value { font-size: 1.2rem; font-weight: 700; margin-top: 0.25rem; }
+.bench-card .stage { font-size: 0.7rem; color: #94a3b8; margin-top: 0.2rem; }
+.bench-single .value { color: #a78bfa; }
+.bench-scatter .value { color: #f97316; }
+.bench-bulk .value { font-size: 1rem; }
+.bench-bulk .value.sharded-color { color: #34d399; }
+.bench-bulk .value.standalone-color { color: #f97316; }
+.bench-bulk .value.speedup-color { color: #38bdf8; }
+.bench-bulk .rate { font-size: 0.7rem; color: #64748b; margin-top: 0.1rem; }
+.form-section input[name="bulkCount"] { width: 80px; }
+.bulk-result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem; }
+.bulk-card { background: #0f172a; border-radius: 0.4rem; padding: 0.6rem; }
+.bulk-card .label { font-size: 0.65rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+.bulk-card .value { font-size: 1rem; font-weight: 700; margin-top: 0.2rem; }
+.bulk-card .sub { font-size: 0.7rem; color: #94a3b8; margin-top: 0.1rem; }
+.speedup-box { background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; padding: 0.75rem; text-align: center; margin-top: 0.5rem; }
+.speedup-box .value { font-size: 1.4rem; font-weight: 800; color: #38bdf8; }
+.speedup-box .label { font-size: 0.7rem; color: #64748b; }
+
+.arch { background: #1e293b; border-radius: 0.5rem; padding: 1rem; margin-bottom: 1rem; }
+.arch h3 { font-size: 0.85rem; margin-bottom: 0.75rem; }
+.arch pre { font-size: 0.7rem; color: #94a3b8; line-height: 1.5; }
+
+.actions { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.actions button {
+  background: transparent; border: 1px solid #334155; border-radius: 0.4rem;
+  padding: 0.4rem 0.75rem; color: #94a3b8; cursor: pointer; font-size: 0.75rem;
+}
+.actions button:hover { border-color: #38bdf8; color: #38bdf8; }
+.actions .danger:hover { border-color: #ef4444; color: #ef4444; }
+
+#feedback { font-size: 0.8rem; min-height: 1.2rem; padding: 0.25rem 0; }
+.shard1 { color: #a78bfa; } .shard2 { color: #f97316; } .both { color: #34d399; }
+
+.port-info { text-align: center; font-size: 0.7rem; color: #64748b; margin-top: 1rem; }
+.port-info a { color: #38bdf8; text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>MongoDB Shard Visualizer</h1>
+  <p>College.Student — Range sharding on <code>{RollNo: 1}</code></p>
+</header>
+
+<div class="container">
+  <div class="form-section" id="formSection">
+    <input type="number" name="RollNo" placeholder="RollNo" min="1001">
+    <input type="text" name="Name" placeholder="Name">
+    <input type="text" name="Dept" placeholder="Dept" value="CS">
+    <select name="Year">
+      <option value="1">Y1</option><option value="2">Y2</option><option value="3" selected>Y3</option><option value="4">Y4</option>
+    </select>
+    <button id="addBtn" onclick="addOne()">Add</button>
+    <button onclick="addBatch()">+10 Batch</button>
+    <button onclick="seedData(100)" style="background:#34d399;color:#0f172a">Seed 100</button>
+    <button onclick="seedData(500)" style="background:#34d399;color:#0f172a">Seed 500</button>
+  </div>
+  <div id="feedback"></div>
+  <div id="flowArrow">⬇ mongos routes by RollNo shard key ⬇</div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchView('unified',this)">Unified (mongos)</div>
+    <div class="tab" onclick="switchView('shards',this)">Per Shard</div>
+    <div class="tab" onclick="switchView('bench',this)">Benchmark</div>
+    <div class="tab" onclick="switchView('arch',this)">Architecture</div>
+  </div>
+
+  <div id="viewUnified">
+    <div class="mongos-box">
+      <h3><span class="dot">●</span> mongos — Unified View <span class="count" id="totalCount">0 students</span></h3>
+      <div class="mongos-content" id="unifiedContent"></div>
+    </div>
+    <div class="bar-track" id="barTrack">
+      <div class="bar-seg bar-s1" id="barS1" style="width:0%">Shard1 0%</div>
+      <div class="bar-seg bar-s2" id="barS2" style="width:0%">Shard2 0%</div>
+    </div>
+  </div>
+
+  <div id="viewShards" style="display:none">
+    <div class="view-grid">
+      <div class="shard-box shard1-box">
+        <h3><span class="dot">●</span> Shard 1 <span class="count" id="s1count">0</span></h3>
+        <div class="shard-content" id="s1content"></div>
+      </div>
+      <div class="shard-box shard2-box">
+        <h3><span class="dot">●</span> Shard 2 <span class="count" id="s2count">0</span></h3>
+        <div class="shard-content" id="s2content"></div>
+      </div>
+    </div>
+    <div class="bar-track">
+      <div class="bar-seg bar-s1" style="width:0%" id="barS1b">0%</div>
+      <div class="bar-seg bar-s2" style="width:0%" id="barS2b">0%</div>
+    </div>
+  </div>
+
+  <div id="viewBench" style="display:none">
+    <div class="bench-section">
+      <h3>Query Performance: Sharded vs Unsharded</h3>
+      <div class="bench-grid" id="benchGrid">
+        <div class="bench-card bench-single">
+          <div class="label">Targeted Query (by RollNo — shard key)</div>
+          <div class="value" id="benchTargeted">—</div>
+          <div class="stage" id="benchTargetedStage"></div>
+        </div>
+        <div class="bench-card bench-scatter">
+          <div class="label">Scatter Query (by Name — not shard key)</div>
+          <div class="value" id="benchScatter">—</div>
+          <div class="stage" id="benchScatterStage"></div>
+        </div>
+      </div>
+      <div class="actions" style="margin-top:0.75rem">
+        <button onclick="runBenchmark()">Run Benchmark</button>
+      </div>
+    </div>
+
+    <div class="bench-section">
+      <h3>Bulk Write Throughput: Sharded (via mongos) vs Standalone (single shard)</h3>
+      <p style="font-size:0.7rem;color:#64748b;margin-bottom:0.75rem">
+        Simulates <strong id="clientLabel">4</strong> concurrent clients writing <strong id="dpcLabel">100K</strong> docs each.
+        Mongos distributes writes across both shards (less contention) vs all writes hitting one node.
+      </p>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap">
+        <label style="font-size:0.7rem;color:#64748b">Clients:
+          <select name="bulkClients" style="background:#0f172a;border:1px solid #334155;border-radius:0.3rem;padding:0.3rem;color:#e2e8f0;font-size:0.75rem">
+            <option value="2">2</option><option value="4" selected>4</option><option value="8">8</option><option value="16">16</option>
+          </select>
+        </label>
+        <label style="font-size:0.7rem;color:#64748b">Docs/client:
+          <select name="bulkDpc" style="background:#0f172a;border:1px solid #334155;border-radius:0.3rem;padding:0.3rem;color:#e2e8f0;font-size:0.75rem">
+            <option value="500">500</option><option value="1000">1K</option><option value="5000">5K</option><option value="10000">10K</option><option value="50000">50K</option><option value="100000" selected>100K</option>
+          </select>
+        </label>
+        <button onclick="runBulkWriteBench()" style="background:#38bdf8;color:#0f172a;border:none;border-radius:0.4rem;padding:0.4rem 0.8rem;font-weight:600;cursor:pointer;font-size:0.75rem">Run Bulk Write</button>
+        <span id="bulkStatus" style="font-size:0.75rem;color:#64748b"></span>
+      </div>
+      <div style="font-size:0.7rem;color:#64748b;margin-bottom:0.5rem" id="bulkConfig"></div>
+      <div class="bulk-result-grid" id="bulkResults" style="display:none">
+        <div class="bulk-card">
+          <div class="label">Sharded (via mongos — distributed to both shards)</div>
+          <div class="value sharded-color" id="bulkShardedMs">—</div>
+          <div class="sub" id="bulkShardedRate"></div>
+        </div>
+        <div class="bulk-card">
+          <div class="label">Standalone (direct to shard1 — single node, contention)</div>
+          <div class="value standalone-color" id="bulkStandaloneMs">—</div>
+          <div class="sub" id="bulkStandaloneRate"></div>
+        </div>
+      </div>
+      <div class="speedup-box" id="bulkSpeedup" style="display:none">
+        <div class="label">Sharding Speedup</div>
+        <div class="value" id="bulkSpeedupValue">—</div>
+      </div>
+      <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.5rem;display:none" id="bulkNote"></div>
+    </div>
+
+    <div style="background:#1e293b;border-radius:0.5rem;padding:1rem">
+      <h3 style="font-size:0.85rem;margin-bottom:0.5rem">How Sharding Improves Performance</h3>
+      <table style="width:100%;font-size:0.75rem;border-collapse:collapse">
+        <tr><th style="text-align:left;padding:0.4rem;border-bottom:1px solid #334155;color:#94a3b8">Query Type</th><th style="text-align:left;padding:0.4rem;border-bottom:1px solid #334155;color:#94a3b8">Routing</th><th style="text-align:left;padding:0.4rem;border-bottom:1px solid #334155;color:#94a3b8">Shards Hit</th><th style="text-align:left;padding:0.4rem;border-bottom:1px solid #334155;color:#94a3b8">Performance</th></tr>
+        <tr><td style="padding:0.4rem;border-bottom:1px solid #1e293b">By RollNo (shard key)</td><td style="padding:0.4rem;border-bottom:1px solid #1e293b;color:#a78bfa">SINGLE_SHARD</td><td style="padding:0.4rem;border-bottom:1px solid #1e293b">1</td><td style="padding:0.4rem;border-bottom:1px solid #1e293b;color:#34d399">Fast — routed directly</td></tr>
+        <tr><td style="padding:0.4rem">By Name (non-shard key)</td><td style="padding:0.4rem;border-bottom:1px solid #1e293b;color:#f97316">SHARD_SCATTER</td><td style="padding:0.4rem;border-bottom:1px solid #1e293b">All</td><td style="padding:0.4rem;color:#f97316">Slower — broadcast to all</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div id="viewArch" style="display:none">
+    <div class="arch">
+      <h3>Cluster Architecture</h3>
+      <pre>                   ┌──────────┐
+                   │ mongosh  │
+                   │  client  │
+                   └────┬─────┘
+                        │
+                   ┌────▼─────┐
+                   │  mongos  │  ← port 27017 / 8081
+                   │  router  │
+                   └────┬─────┘
+                        │
+           ┌────────────┼────────────┐
+           │            │            │
+      ┌────▼─────┐ ┌───▼────┐ ┌───▼────┐
+      │ configsvr│ │ shard1 │ │ shard2 │
+      │ metadata │ │  data  │ │  data  │
+      │  :27019  │ │ :27020 │ │ :27021 │
+      │          │ │ :8082  │ │ :8083  │
+      └──────────┘ └────────┘ └────────┘</pre>
+      <p style="font-size:0.75rem;color:#94a3b8;margin-top:0.5rem">
+        mongos routes queries using the shard key <code>{RollNo: 1}</code>.
+        Benchmarks show SINGLE_SHARD vs SHARD_SCATTER performance difference.
+      </p>
+    </div>
+  </div>
+
+  <div class="port-info">
+    mongo-express: <a href="http://localhost:8081" target="_blank">8081 (mongos)</a> ·
+    <a href="http://localhost:8082" target="_blank">8082 (shard1)</a> ·
+    <a href="http://localhost:8083" target="_blank">8083 (shard2)</a>
+    &nbsp;|&nbsp; <a href="http://localhost:3000" target="_blank">this page</a>
+  </div>
+</div>
+
+<script>
+async function api(path, opts = {}) {
+  const r = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts })
+  return r.json()
+}
+
+function card(d, cls) {
+  return `<div class="s-card ${cls}"><span class="rn">#${d.RollNo}</span> ${d.Name}</div>`
+}
+
+async function refresh() {
+  const [students, shardData] = await Promise.all([api('/api/students'), api('/api/shard-data')])
+  const uni = document.getElementById('unifiedContent')
+  const s1el = document.getElementById('s1content')
+  const s2el = document.getElementById('s2content')
+  const total = document.getElementById('totalCount')
+
+  uni.innerHTML = students.map(d => card(d, d.shard === 'shard1' ? '' : d.shard === 'shard2' ? '' : '')).join('')
+  total.textContent = students.length + ' students'
+  document.getElementById('s1count').textContent = shardData.shard1.length + ' docs'
+  document.getElementById('s2count').textContent = shardData.shard2.length + ' docs'
+  s1el.innerHTML = shardData.shard1.map(d => card(d, '')).join('')
+  s2el.innerHTML = shardData.shard2.map(d => card(d, '')).join('')
+
+  const n1 = shardData.shard1.length, n2 = shardData.shard2.length
+  const totalN = n1 + n2 || 1
+  const p1 = (n1 / totalN * 100).toFixed(0), p2 = (n2 / totalN * 100).toFixed(0)
+  for (const [s1, s2] of [['barS1','barS2'],['barS1b','barS2b']]) {
+    document.getElementById(s1).style.width = p1 + '%'
+    document.getElementById(s2).style.width = p2 + '%'
+    document.getElementById(s1).textContent = n1 ? `Shard1 ${p1}%` : ''
+    document.getElementById(s2).textContent = n2 ? `Shard2 ${p2}%` : ''
+  }
+}
+
+let adding = false
+async function addOne(rn, nm, dp, yr) {
+  if (adding) return; adding = true
+  const btn = document.getElementById('addBtn'); btn.disabled = true
+  const RollNo = rn || +document.querySelector('input[name="RollNo"]').value
+  const Name = nm || document.querySelector('input[name="Name"]').value
+  const Dept = dp || document.querySelector('input[name="Dept"]').value || 'CS'
+  const Year = yr || +document.querySelector('select[name="Year"]').value
+  if (!RollNo || !Name) { feedback('RollNo and Name required'); adding = false; btn.disabled = false; return }
+  feedback(`Inserting ${Name} through mongos...`)
+  document.getElementById('flowArrow').classList.add('active')
+  const r = await api('/api/student', { method: 'POST', body: JSON.stringify({ RollNo, Name, Dept, Year }) })
+  document.getElementById('flowArrow').classList.remove('active')
+  feedback(`<span class="${r.landed}">${Name} → ${r.landed} (RollNo ${RollNo})</span>`)
+  if (!rn) { document.querySelector('input[name="RollNo"]').value = ''; document.querySelector('input[name="Name"]').value = '' }
+  await refresh(); adding = false; btn.disabled = false
+}
+
+async function addBatch() {
+  feedback('Adding 10 students...')
+  const names = ['Liam','Emma','Noah','Olivia','James','Ava','William','Sophia','Oliver','Mia']
+  const depts = ['CS','EC','ME']
+  for (let i = 0; i < 10; i++) await addOne(1021 + i, names[i], depts[i % 3], (i % 4) + 1)
+}
+
+async function splitData() {
+  feedback('Splitting chunks and balancing...'); document.getElementById('flowArrow').classList.add('active')
+  const r = await api('/api/split', { method: 'POST', body: JSON.stringify({ at: 2000 }) })
+  document.getElementById('flowArrow').classList.remove('active')
+  if (r.error) feedback('Split error: ' + r.error)
+  else feedback(`Balanced: Shard1=${r.shard1}, Shard2=${r.shard2}`)
+  await refresh()
+}
+
+function feedback(html) { document.getElementById('feedback').innerHTML = html }
+
+function switchView(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  el.classList.add('active')
+  document.querySelectorAll('[id^="view"]').forEach(v => v.style.display = 'none')
+  document.getElementById('view' + name.charAt(0).toUpperCase() + name.slice(1)).style.display = 'block'
+}
+
+async function runBenchmark() {
+  document.getElementById('benchTargeted').textContent = 'Running...'
+  document.getElementById('benchScatter').textContent = 'Running...'
+  const r = await api('/api/benchmark')
+  document.getElementById('benchTargeted').textContent = r[0].avgMs + ' ms'
+  document.getElementById('benchTargetedStage').textContent = r[0].stage + ' — ' + r[0].nShards + ' shard(s)'
+  document.getElementById('benchScatter').textContent = r[1].avgMs + ' ms'
+  document.getElementById('benchScatterStage').textContent = r[1].stage + ' — ' + r[1].nShards + ' shard(s)'
+}
+
+async function seedData(n) {
+  feedback(`Seeding ${n} students...`)
+  const r = await api('/api/seed', { method: 'POST', body: JSON.stringify({ count: n }) })
+  feedback(`Seeded ${r.count} — shard1: ${r.shard1Docs} docs, shard2: ${r.shard2Docs} docs (${r.balanced})`)
+  await refresh()
+}
+
+async function runBulkWriteBench() {
+  const clients = +document.querySelector('select[name="bulkClients"]').value
+  const dpc = +document.querySelector('select[name="bulkDpc"]').value
+  document.getElementById('clientLabel').textContent = clients
+  document.getElementById('dpcLabel').textContent = dpc
+  const total = clients * dpc
+  document.getElementById('bulkConfig').textContent = `${clients} clients × ${dpc} docs = ${total} total writes`
+  document.getElementById('bulkStatus').textContent = `Running (this may take a moment)...`
+  document.getElementById('bulkResults').style.display = 'none'
+  document.getElementById('bulkSpeedup').style.display = 'none'
+  document.getElementById('bulkNote').style.display = 'none'
+  const r = await api('/api/bulk-benchmark', { method: 'POST', body: JSON.stringify({ clients, docsPerClient: dpc }) })
+  document.getElementById('bulkStatus').textContent = ''
+  document.getElementById('bulkResults').style.display = 'grid'
+  document.getElementById('bulkSpeedup').style.display = 'block'
+  document.getElementById('bulkShardedMs').textContent = r.shardedMs + ' ms'
+  document.getElementById('bulkShardedRate').textContent = r.shardedRate + ' docs/sec'
+  document.getElementById('bulkStandaloneMs').textContent = r.standaloneMs + ' ms'
+  document.getElementById('bulkStandaloneRate').textContent = r.standaloneRate + ' docs/sec'
+  const cmp = r.standaloneMs / r.shardedMs
+  const speedupEl = document.getElementById('bulkSpeedupValue')
+  speedupEl.textContent = cmp > 1.05
+    ? r.speedup + ' faster via sharding'
+    : cmp < 0.95
+    ? r.speedup + ' slower (routing overhead)'
+    : '~ comparable'
+  speedupEl.style.color = cmp > 1.05 ? '#34d399' : cmp < 0.95 ? '#f97316' : '#94a3b8'
+  document.getElementById('bulkNote').style.display = 'block'
+  document.getElementById('bulkNote').textContent = r.note || ''
+}
+
+// init
+refresh()
+</script>
+</body>
+</html>
