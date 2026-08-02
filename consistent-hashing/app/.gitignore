@@ -1,0 +1,21 @@
+### Java & Build ###
+*.class
+*.jar
+target/
+build/
+out/
+
+### Logs ###
+*.log
+
+### Data ###
+data/
+
+### IDE ###
+.idea/
+*.iml
+.vscode/
+
+### OS ###
+.DS_Store
+Thumbs.db

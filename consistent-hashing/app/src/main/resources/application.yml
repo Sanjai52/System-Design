@@ -1,0 +1,31 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: student-sharding
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.mongo.MongoDataAutoConfiguration
+
+sharding:
+  database: College
+  collection: Student
+  virtual-nodes: 100
+  container-prefix: ch-
+  compose-file: ../docker-compose.yml
+  nodes:
+    - id: node1
+      host: localhost
+      port: 27030
+    - id: node2
+      host: localhost
+      port: 27031
+    - id: node3
+      host: localhost
+      port: 27032
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
