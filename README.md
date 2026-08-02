@@ -4,10 +4,11 @@
 |---------|-------------|
 | [URL-SHORTENER](URL-SHORTENER) | URL shortener service — Spring Boot, PostgreSQL, Redis cache |
 | [db_sharding](db_sharding) | MongoDB horizontal sharding (mongos + config server + 2 shards, range-based chunks) for Student records |
-| [consistent-hashing](consistent-hashing) | Application-level Consistent Hashing sharding of Student records across standalone MongoDB instances (Docker) — hash ring + virtual nodes, dashboard UI, migration with measured before/after distribution |
-| [consistent_hashing](consistent_hashing) | Parallel implementation of the same lab — Spring Boot app with tests, Dockerfile, and analysis docs |
+| [consistent_hashing_demo](consistent_hashing_demo) | Consistent Hashing sharding — demo variant (by **Sanjai**): dashboard UI, docker container lifecycle, measured distribution on 10,000 records |
+| [consistent_hashing_prod](consistent_hashing_prod) | Consistent Hashing sharding — prod-style variant (by **Jovan**): 21 unit tests, Dockerfile, mongo-express, analysis docs |
 | [docs](docs) | Lab plans and design specs |
 
-The `consistent-hashing` project is the follow-up to `db_sharding`: it replaces
-mongos/range-chunk routing with an in-app hash ring (SHA-256 + 100 virtual nodes/node)
-so that adding or removing a storage node migrates only the affected records.
+Both `consistent_hashing_*` projects replace mongos/range-chunk routing with an in-app
+hash ring (SHA-256 + virtual nodes/node) so that adding or removing a storage node
+migrates only the affected records. See [their READMEs](consistent_hashing_demo/README.md)
+for the full lab analysis.
