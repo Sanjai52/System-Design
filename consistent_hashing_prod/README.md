@@ -16,7 +16,7 @@ logic; each MongoDB instance is a standalone `mongod` with no config server and 
 ./setup.sh
 
 # 2. Build & run the Spring Boot app (in another terminal)
-cd consistent_hashing        # from the repo root
+cd consistent_hashing_prod      # from the repo root
 mvn spring-boot:run
 
 # 3. Open the UI
@@ -153,7 +153,7 @@ student mapping, in-memory store, student + node + distribution services.
 ## Project structure
 
 ```
-consistent_hashing/
+consistent_hashing_prod/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── setup.sh
