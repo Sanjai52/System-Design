@@ -17,15 +17,15 @@ for NODE in node1 node2 node3; do
 done
 
 echo "=== Seeding $SEED_COUNT students through the hash ring ==="
-curl -s -X POST "$BASE/api/admin/seed?count=$SEED_COUNT"
+curl -s -X POST "$BASE/api/seed?count=$SEED_COUNT"
 echo
 
 echo "=== Distribution with 3 nodes ==="
-curl -s "$BASE/api/admin/distribution"
+curl -s "$BASE/api/distribution"
 echo
 
 echo "=== Ring snapshot (3 nodes) ==="
-curl -s "$BASE/api/admin/ring"
+curl -s "$BASE/api/ring"
 echo
 
 echo "=== Reading back a sample of students (verifies retrieval routing) ==="
@@ -42,23 +42,23 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' ch-node4 2>/dev/null)" =
 done
 
 echo "=== Adding node4 to the hash ring (migrates only affected records) ==="
-curl -s -X POST "$BASE/api/admin/nodes" -H "Content-Type: application/json" \
+curl -s -X POST "$BASE/api/nodes" -H "Content-Type: application/json" \
   -d '{"id":"node4","host":"localhost","port":27033}'
 echo
 
 echo "=== Ring snapshot (4 nodes) ==="
-curl -s "$BASE/api/admin/ring"
+curl -s "$BASE/api/ring"
 echo
 
 echo "=== Removing node1 from the hash ring (redistributes only its records) ==="
-curl -s -X DELETE "$BASE/api/admin/nodes/node1"
+curl -s -X DELETE "$BASE/api/nodes/node1"
 echo
 
 echo "=== Physically stopping the removed node1 container ==="
 docker compose stop node1
 
 echo "=== Final distribution (3 nodes) ==="
-curl -s "$BASE/api/admin/distribution"
+curl -s "$BASE/api/distribution"
 echo
 
 echo "=== Done ==="

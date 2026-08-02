@@ -120,7 +120,7 @@ function colorOf(id) {
 }
 
 async function api(path, opts) {
-  const res = await fetch("/api/admin" + path, opts);
+  const res = await fetch(path, opts);
   if (!res.ok) {
     let msg = res.statusText;
     try { msg = (await res.json()).error || msg; } catch (e) {}
@@ -144,7 +144,7 @@ function setBusy(b) {
 
 async function loadAll() {
   try {
-    const [d, r] = await Promise.all([api("/distribution"), api("/ring")]);
+    const [d, r] = await Promise.all([api("/api/distribution"), api("/api/ring")]);
     dist = d;
     ring = r;
     renderChips();
@@ -258,7 +258,7 @@ async function addShard() {
   try {
     prev = dist;
     const t0 = performance.now();
-    const res = await api("/nodes", {
+    const res = await api("/api/nodes", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({id: node.id, host: node.host, port: node.port}),
@@ -284,7 +284,7 @@ async function removeShard() {
   try {
     prev = dist;
     const t0 = performance.now();
-    const res = await api("/nodes/" + encodeURIComponent(id), {method: "DELETE"});
+    const res = await api("/api/nodes/" + encodeURIComponent(id), {method: "DELETE"});
     const seconds = ((performance.now() - t0) / 1000).toFixed(1);
     pushHistory(res, seconds);
     dist = res.distribution;
@@ -304,7 +304,7 @@ async function seed() {
   setStatus("Seeding 10,000 students through the hash ring…");
   try {
     prev = null;
-    dist = await api("/seed?count=10000");
+    dist = await api("/api/seed?count=10000");
     await loadAll();
     setStatus("Seeded 10,000 students.");
   } catch (e) {
