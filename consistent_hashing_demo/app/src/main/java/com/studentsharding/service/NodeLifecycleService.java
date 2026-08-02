@@ -3,6 +3,7 @@ package com.studentsharding.service;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.studentsharding.config.ShardProperties;
+import com.studentsharding.domain.ShardNode;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,7 @@ public class NodeLifecycleService {
         this.composeFile = props.composeFile();
     }
 
-    public void start(ShardProperties.ShardNode node) {
+    public void start(ShardNode node) {
         String container = containerPrefix + node.id();
         if (!runDocker("start", container)) {
             runDocker("compose", "-f", composeFile, "up", "-d", node.id());

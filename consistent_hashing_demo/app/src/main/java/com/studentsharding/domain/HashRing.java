@@ -1,4 +1,4 @@
-package com.studentsharding.sharding;
+package com.studentsharding.domain;
 
 import com.studentsharding.dto.RingPoint;
 
@@ -20,16 +20,16 @@ public class HashRing {
 
     private static final double TWO_POW_256 = Math.pow(2, 256);
 
-    private final int virtualNodes;
+    private final int virtualNodesPerNode;
     private final TreeMap<BigInteger, String> ring = new TreeMap<>();
     private final Set<String> physicalNodes = new HashSet<>();
 
-    public HashRing(int virtualNodes) {
-        this.virtualNodes = virtualNodes;
+    public HashRing(int virtualNodesPerNode) {
+        this.virtualNodesPerNode = virtualNodesPerNode;
     }
 
     public void addNode(String nodeId) {
-        for (int i = 0; i < virtualNodes; i++) {
+        for (int i = 0; i < virtualNodesPerNode; i++) {
             ring.put(hash(nodeId + "#" + i), nodeId);
         }
         physicalNodes.add(nodeId);
@@ -50,11 +50,15 @@ public class HashRing {
         return Collections.unmodifiableSet(physicalNodes);
     }
 
+    public int virtualNodesPerNode() {
+        return virtualNodesPerNode;
+    }
+
     public int virtualPointCount() {
         return ring.size();
     }
 
-    public Map<String, Integer> virtualNodesPerNode() {
+    public Map<String, Integer> virtualNodesPerNodeCounts() {
         Map<String, Integer> counts = new HashMap<>();
         ring.values().forEach(nodeId -> counts.merge(nodeId, 1, Integer::sum));
         return counts;
