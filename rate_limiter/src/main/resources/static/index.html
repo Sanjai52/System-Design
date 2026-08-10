@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Bucket Rate Limiter</title>
+    <style>
+        :root { --bg: #0f1115; --panel: #171a21; --border: #2a2f3a; --text: #e6e9ef; --muted: #8b93a3; --ok: #22c55e; --block: #ef4444; --accent: #4f8cff; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, sans-serif; padding: 24px; }
+        h1 { font-size: 22px; margin-bottom: 4px; }
+        .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 960px; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+        .panel h2 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+        label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+        input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 14px; margin-bottom: 12px; }
+        button { background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 8px 14px; font-size: 14px; cursor: pointer; margin-right: 8px; }
+        button.secondary { background: var(--border); color: var(--text); }
+        button:disabled { opacity: .5; cursor: not-allowed; }
+        .stats { display: flex; gap: 16px; margin: 12px 0; }
+        .stat { flex: 1; text-align: center; padding: 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); }
+        .stat .num { font-size: 24px; font-weight: 700; }
+        .stat .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+        .gauge-wrap { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; height: 14px; overflow: hidden; margin-top: 8px; }
+        .gauge { height: 100%; background: linear-gradient(90deg, #22c55e, #84cc16); transition: width .3s; width: 0%; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+        th { color: var(--muted); font-weight: 500; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+        .badge.ok { background: rgba(34,197,94,.15); color: var(--ok); }
+        .badge.block { background: rgba(239,68,68,.15); color: var(--block); }
+        .scroll { max-height: 260px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+<h1>Token Bucket Rate Limiter</h1>
+<p class="sub">Spring Boot + Redis Lua · X-Client-Id identifies each client</p>
+
+<div class="grid">
+    <div class="panel">
+        <h2>Client</h2>
+        <label for="clientId">Client ID (X-Client-Id header)</label>
+        <input id="clientId" type="text" value="alice" placeholder="alice">
+        <button onclick="hit()">Send request</button>
+        <button class="secondary" onclick="burst()" id="burstBtn">Burst 30 requests</button>
+        <div class="stats">
+            <div class="stat"><div class="num" id="c200">0</div><div class="lbl">200 OK</div></div>
+            <div class="stat"><div class="num" id="c429">0</div><div class="lbl">429 blocked</div></div>
+        </div>
+        <h2 style="margin-top:16px">Bucket</h2>
+        <div id="bucketInfo" style="font-size:13px;color:var(--muted)">capacity 10 · refill 2/s</div>
+        <div class="gauge-wrap"><div class="gauge" id="gauge"></div></div>
+    </div>
+
+    <div class="panel">
+        <h2>Last requests</h2>
+        <div class="scroll">
+            <table>
+                <thead><tr><th>#</th><th>Status</th><th>Time</th></tr></thead>
+                <tbody id="log"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let total = 0;
+
+    function clientId() { return document.getElementById("clientId").value.trim() || "anonymous"; }
+
+    async function hit() {
+        const id = clientId();
+        const started = performance.now();
+        const res = await fetch("/api/demo", { headers: { "X-Client-Id": id } });
+        const ms = Math.round(performance.now() - started);
+        const ok = res.status === 200;
+        total++;
+        document.getElementById(ok ? "c200" : "c429").textContent = String(Number(document.getElementById(ok ? "c200" : "c429").textContent) + 1);
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${total}</td><td><span class="badge ${ok ? "ok" : "block"}">${res.status}</span></td><td>${ms} ms</td>`;
+        document.getElementById("log").prepend(row);
+        refreshBucket(id);
+    }
+
+    async function burst() {
+        const btn = document.getElementById("burstBtn");
+        btn.disabled = true;
+        await Promise.all(Array.from({ length: 30 }, () => hit()));
+        btn.disabled = false;
+    }
+
+    async function refreshBucket(id) {
+        try {
+            const res = await fetch("/api/ratelimit/status", { headers: { "X-Client-Id": id } });
+            const b = await res.json();
+            document.getElementById("bucketInfo").textContent = `capacity ${b.capacity} · refill ${b.refillRate}/s · tokens left ${Number(b.tokens).toFixed(2)}`;
+            document.getElementById("gauge").style.width = `${Math.min(100, (b.tokens / b.capacity) * 100)}%`;
+        } catch (e) { /* bucket endpoint limited as well; ignore */ }
+    }
+</script>
+</body>
+</html>
