@@ -98,6 +98,8 @@
             document.getElementById("gauge").style.width = `${Math.min(100, (b.tokens / b.capacity) * 100)}%`;
         } catch (e) { /* bucket endpoint limited as well; ignore */ }
     }
+
+    setInterval(() => refreshBucket(clientId()), 500);
 </script>
 </body>
 </html>

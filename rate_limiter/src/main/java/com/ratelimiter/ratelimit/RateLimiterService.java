@@ -19,6 +19,9 @@ public class RateLimiterService {
 
     private static final DefaultRedisScript<Long> ALLOW_SCRIPT = new DefaultRedisScript<>(RateLimitLua.SCRIPT, Long.class);
 
+    private static final DefaultRedisScript<String> TIME_SCRIPT = new DefaultRedisScript<>(
+            "local t = redis.call('TIME'); return t[1] .. '.' .. t[2]", String.class);
+
     public boolean tryAcquire(String clientId) {
         Long allowed = redis.execute(ALLOW_SCRIPT, List.of(key(clientId)),
                 String.valueOf(properties.getBucketCapacity()),
@@ -43,10 +46,23 @@ public class RateLimiterService {
         status.put("clientId", clientId);
         status.put("capacity", properties.getBucketCapacity());
         status.put("refillRate", properties.getRefillRate());
-        status.put("tokens", bucket.isEmpty() ? (double) properties.getBucketCapacity() : Double.parseDouble((String) bucket.get("tokens")));
-        status.put("lastRefill", bucket.isEmpty() ? null : Double.parseDouble((String) bucket.get("last_refill")));
         status.put("idleTtlSeconds", properties.getIdleTtlSeconds());
+        if (bucket.isEmpty()) {
+            status.put("tokens", (double) properties.getBucketCapacity());
+            status.put("lastRefill", null);
+        } else {
+            double tokens = Double.parseDouble((String) bucket.get("tokens"));
+            double lastRefill = Double.parseDouble((String) bucket.get("last_refill"));
+            tokens = Math.min(properties.getBucketCapacity(),
+                    tokens + Math.max(0, nowSeconds() - lastRefill) * properties.getRefillRate());
+            status.put("tokens", tokens);
+            status.put("lastRefill", lastRefill);
+        }
         return status;
+    }
+
+    private double nowSeconds() {
+        return Double.parseDouble(redis.execute(TIME_SCRIPT, List.of()));
     }
 
     private Double currentTokens(String clientId) {

@@ -102,4 +102,17 @@ class RateLimiterServiceTest {
         assertTrue(service.retryAfterSeconds("retry") >= 1, "retry-after at least 1s");
         assertNotNull(service.status("retry").get("tokens"));
     }
+
+    @Test
+    void statusProjectsRefillWhileIdle() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            service.tryAcquire("proj");
+        }
+        double drained = (double) service.status("proj").get("tokens");
+        assertTrue(drained < 1.0, "drained bucket near zero, was " + drained);
+        Thread.sleep(1100);
+        double refilled = (double) service.status("proj").get("tokens");
+        assertTrue(refilled > drained + 0.9, "status reflects refill while idle: " + drained + " -> " + refilled);
+        assertTrue(refilled <= 5.0 + 1e-6, "refill capped at capacity, was " + refilled);
+    }
 }
