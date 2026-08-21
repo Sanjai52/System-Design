@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocomplete Search</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #1a73e8;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: #1a73e8;
+        }
+
+        .suggestions {
+            list-style: none;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+
+        .suggestions.active {
+            display: block;
+        }
+
+        .suggestions li {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .suggestions li:last-child {
+            border-bottom: none;
+        }
+
+        .suggestions li:hover {
+            background: #f5f5f5;
+        }
+
+        .cache-status {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+
+        .cache-hit {
+            color: #34a853;
+            font-weight: 600;
+        }
+
+        .cache-miss {
+            color: #ea4335;
+            font-weight: 600;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #888;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Autocomplete Search</h1>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Type to search..." autocomplete="off">
+            <ul class="suggestions" id="suggestions"></ul>
+        </div>
+        <div class="cache-status" id="cacheStatus" style="display: none;"></div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const suggestionsList = document.getElementById('suggestions');
+        const cacheStatusDiv = document.getElementById('cacheStatus');
+
+        let debounceTimer;
+
+        searchInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const prefix = this.value.trim();
+
+            if (prefix.length === 0) {
+                suggestionsList.classList.remove('active');
+                cacheStatusDiv.style.display = 'none';
+                return;
+            }
+
+            debounceTimer = setTimeout(() => fetchSuggestions(prefix), 200);
+        });
+
+        searchInput.addEventListener('blur', function() {
+            setTimeout(() => suggestionsList.classList.remove('active'), 200);
+        });
+
+        searchInput.addEventListener('focus', function() {
+            if (suggestionsList.children.length > 0) {
+                suggestionsList.classList.add('active');
+            }
+        });
+
+        async function fetchSuggestions(prefix) {
+            try {
+                const response = await fetch(`/api/autocomplete?prefix=${encodeURIComponent(prefix)}&k=8`);
+                const data = await response.json();
+
+                if (data.count > 0) {
+                    cacheStatusDiv.textContent = data.cached ? 'Cache Hit' : 'Cache Miss';
+                    cacheStatusDiv.className = data.cached ? 'cache-status cache-hit' : 'cache-status cache-miss';
+                    cacheStatusDiv.style.display = 'block';
+                } else {
+                    cacheStatusDiv.style.display = 'none';
+                }
+
+                displaySuggestions(data.suggestions);
+            } catch (error) {
+                console.error('Error fetching suggestions:', error);
+                suggestionsList.innerHTML = '<li class="no-results">Error fetching results</li>';
+                suggestionsList.classList.add('active');
+            }
+        }
+
+        function displaySuggestions(suggestions) {
+            suggestionsList.innerHTML = '';
+
+            if (suggestions.length === 0) {
+                suggestionsList.innerHTML = '<li class="no-results">No suggestions found</li>';
+                suggestionsList.classList.add('active');
+                return;
+            }
+
+            suggestions.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item.term;
+                li.addEventListener('click', () => {
+                    searchInput.value = item.term;
+                    fetchSuggestions(item.term);
+                });
+                suggestionsList.appendChild(li);
+            });
+
+            suggestionsList.classList.add('active');
+        }
+    </script>
+</body>
+</html>
