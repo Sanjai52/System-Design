@@ -7,6 +7,7 @@
 | [consistent_hashing_demo](consistent_hashing_demo) | Consistent Hashing sharding — demo variant (by **Sanjai**): dashboard UI, docker container lifecycle, measured distribution on 10,000 records |
 | [consistent_hashing_prod](consistent_hashing_prod) | Consistent Hashing sharding — prod-style variant (by **Jovan**): 21 unit tests, Dockerfile, mongo-express, analysis docs |
 | [rate_limiter](rate_limiter) | API Rate Limiter — Spring Boot + Redis, Token Bucket via atomic Lua script, 429 + Retry-After, normal/burst load test |
+| [auto_complete](auto_complete) | Autocomplete Search — Spring Boot + Trie + Redis cache, real-time prefix suggestions, JMeter load tests |
 | [docs](docs) | Lab plans and design specs |
 
 Both `consistent_hashing_*` projects replace mongos/range-chunk routing with an in-app
