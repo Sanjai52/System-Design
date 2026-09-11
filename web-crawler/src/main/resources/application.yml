@@ -1,0 +1,17 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 5000
+
+crawler:
+  max-pages: 50
+  max-depth: 5
+  connection-timeout-ms: 5000
+  socket-timeout-ms: 5000
+  user-agent: "UCS3513-WebCrawler/1.0"
+  thread-count: 4
