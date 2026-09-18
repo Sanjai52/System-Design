@@ -117,6 +117,10 @@ public class CrawlStateRepository {
         fields.put("status", result.getStatus().name());
         fields.put("discoveredLinks", String.valueOf(result.getDiscoveredLinks()));
         fields.put("timestamp", result.getTimestamp().format(FORMATTER));
+        fields.put("parentUrl", result.getParentUrl() != null ? result.getParentUrl() : "");
+        fields.put("depth", String.valueOf(result.getDepth()));
+        java.util.List<String> kids = result.getChildUrls() != null ? result.getChildUrls() : java.util.List.of();
+        fields.put("childUrls", String.join("\n", kids));
         if (result.getError() != null) {
             fields.put("error", result.getError());
         }
@@ -134,6 +138,21 @@ public class CrawlStateRepository {
             result.setUrl((String) fields.get("url"));
             result.setStatus(CrawlStatus.valueOf((String) fields.get("status")));
             result.setDiscoveredLinks(Integer.parseInt((String) fields.get("discoveredLinks")));
+            Object parentRaw = fields.get("parentUrl");
+            String parent = parentRaw != null ? parentRaw.toString() : "";
+            result.setParentUrl(parent.isEmpty() ? null : parent);
+            Object depthRaw = fields.get("depth");
+            int depth = 0;
+            try { depth = depthRaw != null ? Integer.parseInt(depthRaw.toString()) : 0; } catch (NumberFormatException ignored) {}
+            result.setDepth(depth);
+            Object kidsRaw = fields.get("childUrls");
+            java.util.List<String> kids = new java.util.ArrayList<>();
+            if (kidsRaw != null && !kidsRaw.toString().isEmpty()) {
+                for (String k : kidsRaw.toString().split("\n", -1)) {
+                    if (!k.isEmpty()) kids.add(k);
+                }
+            }
+            result.setChildUrls(kids);
             if (fields.containsKey("timestamp")) {
                 result.setTimestamp(LocalDateTime.parse((String) fields.get("timestamp"), FORMATTER));
             }
@@ -153,6 +172,26 @@ public class CrawlStateRepository {
         if (resultKeys != null) {
             redisTemplate.delete(resultKeys);
         }
+    }
+
+    public java.util.List<CrawlJob> getAllJobs() {
+        Set<String> keys = redisTemplate.keys(JOB_PREFIX + "*");
+        if (keys == null || keys.isEmpty()) return java.util.List.of();
+        java.util.List<CrawlJob> jobs = new java.util.ArrayList<>();
+        for (String key : keys) {
+            String jobId = key.substring(JOB_PREFIX.length());
+            CrawlJob job = getJob(jobId);
+            if (job != null) jobs.add(job);
+        }
+        return jobs;
+    }
+
+    public java.util.List<CrawlJob> findJobsBySeedContains(String query) {
+        if (query == null || query.isBlank()) return java.util.List.of();
+        String q = query.toLowerCase();
+        return getAllJobs().stream()
+                .filter(j -> j.getSeedUrl() != null && j.getSeedUrl().toLowerCase().contains(q))
+                .collect(java.util.stream.Collectors.toList());
     }
 
     private String generateUrlKey(String url) {

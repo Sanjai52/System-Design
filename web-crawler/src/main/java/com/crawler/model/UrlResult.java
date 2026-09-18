@@ -33,4 +33,19 @@ public class UrlResult {
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    private String parentUrl;
+    private int depth;
+    private java.util.List<String> childUrls = new java.util.ArrayList<>();
+
+    public String getParentUrl() { return parentUrl; }
+    public void setParentUrl(String parentUrl) { this.parentUrl = parentUrl; }
+
+    public int getDepth() { return depth; }
+    public void setDepth(int depth) { this.depth = depth; }
+
+    public java.util.List<String> getChildUrls() { return childUrls; }
+    public void setChildUrls(java.util.List<String> childUrls) {
+        this.childUrls = childUrls != null ? childUrls : new java.util.ArrayList<>();
+    }
 }

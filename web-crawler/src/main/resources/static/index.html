@@ -140,6 +140,11 @@
         <header>
             <h1>Web Crawler</h1>
             <p class="subtitle">BFS-based web crawler with Redis state management</p>
+            <p style="margin-top:12px">
+                <a class="btn btn-primary" href="/hierarchy.html" style="text-decoration:none;display:inline-block">
+                    View Hierarchy
+                </a>
+            </p>
         </header>
 
         <div class="card">
@@ -167,6 +172,7 @@
                 <span id="jobBadge"></span>
                 <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="stopCrawl()">Stop</button>
             </h2>
+            <div id="jobIdLine" style="font-size:0.8rem;color:#94a3b8;margin-bottom:12px;word-break:break-all"></div>
             <div class="status-bar">
                 <div class="stat">
                     <div class="stat-value" id="statPages">0</div>
@@ -211,6 +217,7 @@
 
                 if (res.ok) {
                     currentJobId = data.jobId;
+                    document.getElementById('jobIdLine').textContent = 'Job ID: ' + data.jobId;
                     document.getElementById('statusCard').classList.remove('hidden');
                     startPolling();
                 }

@@ -3,6 +3,7 @@ package com.crawler.service;
 import com.crawler.config.CrawlerConfig;
 import com.crawler.model.CrawlJob;
 import com.crawler.model.CrawlStatus;
+import com.crawler.model.CrawlTask;
 import com.crawler.repository.CrawlStateRepository;
 import com.crawler.worker.CrawlWorker;
 import org.slf4j.Logger;
@@ -61,7 +62,7 @@ public class CrawlService {
 
         // Mark seed URL as visited and add to queue
         crawlStateRepository.markVisited(jobId, seedUrl);
-        queueService.addUrl(seedUrl);
+        queueService.addTask(new CrawlTask(seedUrl, null, 0));
 
         // Create worker and executor
         CrawlWorker worker = new CrawlWorker(
