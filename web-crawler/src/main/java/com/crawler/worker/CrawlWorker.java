@@ -6,6 +6,7 @@ import com.crawler.model.UrlResult;
 import com.crawler.repository.CrawlStateRepository;
 import com.crawler.service.PageFetcherService;
 import com.crawler.service.UrlDiscoveryService;
+import com.crawler.service.TextTokenizer;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,6 +111,17 @@ public class CrawlWorker implements Runnable {
             List<String> discoveredUrls = urlDiscoveryService.extractLinks(document, url);
             int linkCount = discoveredUrls.size();
             context.addUrls(linkCount);
+            try {
+                String pageText = document.body() != null ? document.body().text() : "";
+                String pageTitle = document.title() != null ? document.title() : "";
+                java.util.Map<String, Integer> termFreq = TextTokenizer.tokenize(pageText);
+                int totalTokens = termFreq.values().stream().mapToInt(Integer::intValue).sum();
+                String snippet = pageText.length() > 200 ? pageText.substring(0, 200) : pageText;
+                crawlStateRepository.indexPage(url, jobId, pageTitle, snippet,
+                        Math.max(1, totalTokens), termFreq);
+            } catch (Exception ie) {
+                log.warn("Indexing failed for {}: {}", url, ie.getMessage());
+            }
 
             java.util.List<String> newChildren = new java.util.ArrayList<>();
             for (String discoveredUrl : discoveredUrls) {
