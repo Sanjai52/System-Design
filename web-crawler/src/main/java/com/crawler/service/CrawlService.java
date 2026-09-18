@@ -71,6 +71,7 @@ public class CrawlService {
         Runnable finishHook = () -> {
             queueService.removeQueue(jobId);
             activeJobs.remove(jobId);
+            executor.shutdown();
             log.info("Crawl job {} completed", jobId);
         };
         for (int i = 0; i < workers; i++) {
