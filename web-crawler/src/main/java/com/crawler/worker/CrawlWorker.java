@@ -1,6 +1,7 @@
 package com.crawler.worker;
 
 import com.crawler.model.CrawlStatus;
+import com.crawler.model.CrawlTask;
 import com.crawler.model.UrlResult;
 import com.crawler.repository.CrawlStateRepository;
 import com.crawler.service.PageFetcherService;
@@ -47,8 +48,8 @@ public class CrawlWorker implements Runnable {
 
         while (running && pagesCrawled < maxPages) {
             try {
-                String url = queueService.pollUrl();
-                if (url == null) {
+                com.crawler.model.CrawlTask task = queueService.pollTask();
+                if (task == null) {
                     // Wait briefly then check again — queue might get new URLs
                     Thread.sleep(200);
                     continue;
@@ -57,7 +58,7 @@ public class CrawlWorker implements Runnable {
                 pagesCrawled++;
                 crawlStateRepository.updateJobProgress(jobId, pagesCrawled, urlsDiscovered);
 
-                processUrl(url);
+                processUrl(task);
 
                 // Small delay to be respectful to target servers
                 Thread.sleep(100);
@@ -77,38 +78,38 @@ public class CrawlWorker implements Runnable {
                 jobId, pagesCrawled, urlsDiscovered, failedCount);
     }
 
-    private void processUrl(String url) {
+    private void processUrl(com.crawler.model.CrawlTask task) {
+        String url = task.getUrl();
         log.info("Processing URL #{}: {}", pagesCrawled, url);
 
-        // Mark as crawling
-        crawlStateRepository.saveUrlResult(jobId,
-                new UrlResult(url, CrawlStatus.CRAWLING, 0));
+        UrlResult crawling = new UrlResult(url, CrawlStatus.CRAWLING, 0);
+        crawling.setParentUrl(task.getParentUrl());
+        crawling.setDepth(task.getDepth());
+        crawlStateRepository.saveUrlResult(jobId, crawling);
 
         try {
-            // Fetch page
             Document document = pageFetcherService.fetchPage(url);
             log.info("Fetched page: {} (title: {})", url, document.title());
 
-            // Extract links
             List<String> discoveredUrls = urlDiscoveryService.extractLinks(document, url);
             int linkCount = discoveredUrls.size();
             urlsDiscovered += linkCount;
 
-            // Check each discovered URL
-            int newUrls = 0;
+            java.util.List<String> newChildren = new java.util.ArrayList<>();
             for (String discoveredUrl : discoveredUrls) {
-                // Atomic duplicate check: SADD returns 1 if new, 0 if exists
                 if (crawlStateRepository.markVisited(jobId, discoveredUrl)) {
-                    queueService.addUrl(discoveredUrl);
-                    newUrls++;
+                    queueService.addTask(new com.crawler.model.CrawlTask(discoveredUrl, url, task.getDepth() + 1));
+                    newChildren.add(discoveredUrl);
                 }
             }
 
-            // Save successful result
-            crawlStateRepository.saveUrlResult(jobId,
-                    new UrlResult(url, CrawlStatus.COMPLETED, linkCount));
+            UrlResult done = new UrlResult(url, CrawlStatus.COMPLETED, linkCount);
+            done.setParentUrl(task.getParentUrl());
+            done.setDepth(task.getDepth());
+            done.setChildUrls(newChildren);
+            crawlStateRepository.saveUrlResult(jobId, done);
 
-            log.info("Completed URL: {} (links: {}, new: {})", url, linkCount, newUrls);
+            log.info("Completed URL: {} (links: {}, new: {})", url, linkCount, newChildren.size());
 
         } catch (Exception e) {
             failedCount++;
@@ -116,6 +117,8 @@ public class CrawlWorker implements Runnable {
             log.warn("FAILED URL #{}: {} — {}", failedCount, url, errorMsg);
 
             UrlResult failedResult = new UrlResult(url, CrawlStatus.FAILED, 0);
+            failedResult.setParentUrl(task.getParentUrl());
+            failedResult.setDepth(task.getDepth());
             failedResult.setError(errorMsg);
             crawlStateRepository.saveUrlResult(jobId, failedResult);
         }
