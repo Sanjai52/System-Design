@@ -77,13 +77,13 @@ async function searchSeed(){
 }
 async function loadTree(id,qs){
   showError('');document.getElementById('searchResults').innerHTML='';
-  const res=await fetch(`/api/crawl/${id}/hierarchy${qs}`);
+  const res=await fetch(`/api/crawl/${encodeURIComponent(id)}/hierarchy${qs}`);
   if(res.status===404){showError('Job not found: '+id);return;}
   if(!res.ok){showError('Failed to load hierarchy: '+res.status);return;}
   const data=await res.json();
   total=0;countNodes(data.tree);
   document.getElementById('counts').textContent=`${total} nodes · seed ${data.seedUrl||''} · ${data.status||''}`;
-  document.getElementById('treeWrap').innerHTML=renderNode(data.tree,true);
+  document.getElementById('treeWrap').innerHTML=`<ul class="tree">${renderNode(data.tree,true)}</ul>`;
   bindToggles();
 }
 function countNodes(n){if(!n)return;total++;(n.children||[]).forEach(countNodes);}
@@ -93,7 +93,7 @@ function renderNode(n,isRoot){
   const caret=has?`<span class="toggle" data-open="true">▾</span>`:`<span class="leaf">•</span>`;
   const visited=n.alreadyVisited?`<span class="visited">already visited</span>`:'';
   let h=`<li class="node">${caret}<span class="badge s-${n.status}">${n.status}</span> <span class="url">${escapeHtml(n.url)}</span><span class="meta">d${n.depth} · ${n.discoveredLinks} links</span>${visited}`;
-  if(has){h+=`<ul>${kids.map(k=>renderNode(k,false)).join('')}</ul>`;}
+  if(has){h+=`<ul class="tree">${kids.map(k=>renderNode(k,false)).join('')}</ul>`;}
   return h+'</li>';
 }
 function bindToggles(){

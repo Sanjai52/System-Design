@@ -62,7 +62,7 @@ public class CrawlService {
 
         // Mark seed URL as visited and add to queue
         crawlStateRepository.markVisited(jobId, seedUrl);
-        queueService.addTask(new com.crawler.model.CrawlTask(seedUrl, null, 0));
+        queueService.addTask(new CrawlTask(seedUrl, null, 0));
 
         // Create worker and executor
         CrawlWorker worker = new CrawlWorker(

@@ -57,11 +57,15 @@ public class HierarchyService {
         UrlResult self = byUrl.get(node.getUrl());
         List<String> kids = self != null && self.getChildUrls() != null ? self.getChildUrls() : List.of();
         if (kids.isEmpty() && node.getDepth() == 0) {
+            java.util.List<UrlResult> orphans = new java.util.ArrayList<>();
             for (UrlResult r : byUrl.values()) {
                 boolean isSeed = r.getUrl() != null && r.getUrl().equals(node.getUrl());
                 boolean noParent = r.getParentUrl() == null || r.getParentUrl().isEmpty();
-                if (!isSeed && noParent) kids = append(kids, r.getUrl());
+                if (!isSeed && noParent) orphans.add(r);
             }
+            orphans.sort(java.util.Comparator.comparing(UrlResult::getTimestamp,
+                    java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())));
+            for (UrlResult r : orphans) kids = append(kids, r.getUrl());
         }
         for (String childUrl : kids) {
             if (childUrl == null || childUrl.isEmpty()) continue;

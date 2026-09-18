@@ -48,7 +48,7 @@ public class CrawlWorker implements Runnable {
 
         while (running && pagesCrawled < maxPages) {
             try {
-                com.crawler.model.CrawlTask task = queueService.pollTask();
+                CrawlTask task = queueService.pollTask();
                 if (task == null) {
                     // Wait briefly then check again — queue might get new URLs
                     Thread.sleep(200);
@@ -78,7 +78,7 @@ public class CrawlWorker implements Runnable {
                 jobId, pagesCrawled, urlsDiscovered, failedCount);
     }
 
-    private void processUrl(com.crawler.model.CrawlTask task) {
+    private void processUrl(CrawlTask task) {
         String url = task.getUrl();
         log.info("Processing URL #{}: {}", pagesCrawled, url);
 
@@ -98,7 +98,7 @@ public class CrawlWorker implements Runnable {
             java.util.List<String> newChildren = new java.util.ArrayList<>();
             for (String discoveredUrl : discoveredUrls) {
                 if (crawlStateRepository.markVisited(jobId, discoveredUrl)) {
-                    queueService.addTask(new com.crawler.model.CrawlTask(discoveredUrl, url, task.getDepth() + 1));
+                    queueService.addTask(new CrawlTask(discoveredUrl, url, task.getDepth() + 1));
                     newChildren.add(discoveredUrl);
                 }
             }
