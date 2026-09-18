@@ -5,7 +5,6 @@ import com.crawler.model.CrawlTask;
 import com.crawler.model.UrlResult;
 import com.crawler.repository.CrawlStateRepository;
 import com.crawler.service.PageFetcherService;
-import com.crawler.service.QueueService;
 import com.crawler.service.UrlDiscoveryService;
 import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
@@ -18,69 +17,86 @@ public class CrawlWorker implements Runnable {
     private static final Logger log = LoggerFactory.getLogger(CrawlWorker.class);
 
     private final String jobId;
-    private final int maxPages;
-    private final QueueService queueService;
+    private final CrawlJobContext context;
     private final PageFetcherService pageFetcherService;
     private final UrlDiscoveryService urlDiscoveryService;
     private final CrawlStateRepository crawlStateRepository;
+    private final Runnable finishHook;
 
-    private volatile boolean running = true;
-    private int pagesCrawled = 0;
-    private int urlsDiscovered = 0;
-    private int failedCount = 0;
-
-    public CrawlWorker(String jobId, int maxPages,
-                       QueueService queueService,
+    public CrawlWorker(String jobId, CrawlJobContext context,
                        PageFetcherService pageFetcherService,
                        UrlDiscoveryService urlDiscoveryService,
-                       CrawlStateRepository crawlStateRepository) {
+                       CrawlStateRepository crawlStateRepository,
+                       Runnable finishHook) {
         this.jobId = jobId;
-        this.maxPages = maxPages;
-        this.queueService = queueService;
+        this.context = context;
         this.pageFetcherService = pageFetcherService;
         this.urlDiscoveryService = urlDiscoveryService;
         this.crawlStateRepository = crawlStateRepository;
+        this.finishHook = finishHook;
     }
 
     @Override
     public void run() {
         log.info("CrawlWorker started for job: {}", jobId);
 
-        while (running && pagesCrawled < maxPages) {
-            try {
-                CrawlTask task = queueService.pollTask();
+        try {
+            while (context.isRunning()) {
+                if (context.getPages() >= context.getMaxPages()) break;
+
+                CrawlTask task = context.pollTask(200);
                 if (task == null) {
-                    // Wait briefly then check again — queue might get new URLs
-                    Thread.sleep(200);
+                    if (!context.isRunning() || Thread.currentThread().isInterrupted()) break;
+                    if (context.isDrained()) {
+                        try {
+                            Thread.sleep(300);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        if (context.isDrained()) break;
+                    }
                     continue;
                 }
 
-                pagesCrawled++;
-                crawlStateRepository.updateJobProgress(jobId, pagesCrawled, urlsDiscovered);
+                int slot = context.claimSlot();
+                if (slot >= context.getMaxPages()) {
+                    context.addTask(task);
+                    break;
+                }
 
-                processUrl(task);
+                context.enterFetch();
+                try {
+                    processUrl(task);
+                } finally {
+                    context.exitFetch();
+                }
+                crawlStateRepository.updateJobProgress(jobId, context.getPages(), context.getUrls());
 
-                // Small delay to be respectful to target servers
-                Thread.sleep(100);
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.info("CrawlWorker interrupted for job: {}", jobId);
-                break;
-            } catch (Exception e) {
-                log.error("Unexpected error in CrawlWorker for job: {}", jobId, e);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        } finally {
+            if (context.markWorkerDone()) {
+                try {
+                    crawlStateRepository.updateJobProgress(jobId, context.getPages(), context.getUrls());
+                    crawlStateRepository.completeJob(jobId);
+                    log.info("Crawl job {} completed (pages: {}, discovered: {}, failed: {})",
+                            jobId, context.getPages(), context.getUrls(), context.getFailed());
+                } finally {
+                    finishHook.run();
+                }
             }
         }
-
-        // Mark job as completed
-        crawlStateRepository.updateJobProgress(jobId, pagesCrawled, urlsDiscovered);
-        log.info("CrawlWorker finished for job: {} (pages: {}, discovered: {}, failed: {})",
-                jobId, pagesCrawled, urlsDiscovered, failedCount);
     }
 
     private void processUrl(CrawlTask task) {
         String url = task.getUrl();
-        log.info("Processing URL #{}: {}", pagesCrawled, url);
+        log.info("Processing URL: {}", url);
 
         UrlResult crawling = new UrlResult(url, CrawlStatus.CRAWLING, 0);
         crawling.setParentUrl(task.getParentUrl());
@@ -93,12 +109,12 @@ public class CrawlWorker implements Runnable {
 
             List<String> discoveredUrls = urlDiscoveryService.extractLinks(document, url);
             int linkCount = discoveredUrls.size();
-            urlsDiscovered += linkCount;
+            context.addUrls(linkCount);
 
             java.util.List<String> newChildren = new java.util.ArrayList<>();
             for (String discoveredUrl : discoveredUrls) {
                 if (crawlStateRepository.markVisited(jobId, discoveredUrl)) {
-                    queueService.addTask(new CrawlTask(discoveredUrl, url, task.getDepth() + 1));
+                    context.addTask(new CrawlTask(discoveredUrl, url, task.getDepth() + 1));
                     newChildren.add(discoveredUrl);
                 }
             }
@@ -112,9 +128,9 @@ public class CrawlWorker implements Runnable {
             log.info("Completed URL: {} (links: {}, new: {})", url, linkCount, newChildren.size());
 
         } catch (Exception e) {
-            failedCount++;
+            context.countFailed();
             String errorMsg = e.getClass().getSimpleName() + ": " + e.getMessage();
-            log.warn("FAILED URL #{}: {} — {}", failedCount, url, errorMsg);
+            log.warn("FAILED URL: {} — {}", url, errorMsg);
 
             UrlResult failedResult = new UrlResult(url, CrawlStatus.FAILED, 0);
             failedResult.setParentUrl(task.getParentUrl());
@@ -125,9 +141,9 @@ public class CrawlWorker implements Runnable {
     }
 
     public void stop() {
-        this.running = false;
+        context.stop();
     }
 
-    public int getPagesCrawled() { return pagesCrawled; }
-    public int getUrlsDiscovered() { return urlsDiscovered; }
+    public int getPagesCrawled() { return context.getPages(); }
+    public int getUrlsDiscovered() { return context.getUrls(); }
 }
