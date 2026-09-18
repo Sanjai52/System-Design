@@ -99,4 +99,22 @@ public class HierarchyServiceTest {
     void blankSearchQueryRejected() {
         assertThrows(IllegalArgumentException.class, () -> service.searchBySeed("  "));
     }
+
+    @Test
+    void latestJobIsNewestByStartTime() {
+        CrawlJob older = new CrawlJob("j-old", "https://old.test", 10);
+        older.setStartTime(java.time.LocalDateTime.of(2026, 1, 1, 0, 0));
+        CrawlJob newer = new CrawlJob("j-new", "https://new.test", 10);
+        newer.setStartTime(java.time.LocalDateTime.of(2026, 2, 1, 0, 0));
+        when(repo.getAllJobs()).thenReturn(List.of(older, newer));
+
+        assertEquals("j-new", service.getLatestJob().orElseThrow().getJobId());
+    }
+
+    @Test
+    void latestJobEmptyWhenNoJobs() {
+        when(repo.getAllJobs()).thenReturn(List.of());
+
+        assertTrue(service.getLatestJob().isEmpty());
+    }
 }

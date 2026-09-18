@@ -50,6 +50,7 @@ ul.tree ul{margin-left:22px;border-left:1px solid rgba(59,130,246,.25);padding-l
 <span id="counts" style="align-self:center;color:#94a3b8;font-size:.85rem"></span>
 </div>
 <div class="legend"><span><span class="badge s-COMPLETED">completed</span> done</span><span><span class="badge s-CRAWLING">crawling</span> active</span><span><span class="badge s-FAILED">failed</span> error</span><span><span class="badge s-QUEUED">queued</span> waiting</span><span class="visited">already visited</span> cycle ref (not expanded)</div>
+<div id="latestLine" style="margin-top:10px;font-size:.85rem;color:#94a3b8"></div>
 <div id="error"></div>
 <div id="searchResults" class="results"></div>
 </div>
@@ -57,6 +58,18 @@ ul.tree ul{margin-left:22px;border-left:1px solid rgba(59,130,246,.25);padding-l
 </div>
 <script>
 let total=0;
+window.addEventListener('DOMContentLoaded',loadLatest);
+async function loadLatest(){
+  try{
+    const res=await fetch('/api/crawl/latest');
+    if(!res.ok)return;
+    const j=await res.json();
+    if(!j||!j.jobId)return;
+    document.getElementById('jobId').value=j.jobId;
+    document.getElementById('latestLine').innerHTML=`Latest job: <span class="badge s-${j.status}">${j.status}</span> <b>${escapeHtml(j.seedUrl||'')}</b> <span class="meta">${j.jobId}</span>`;
+    await loadTree(j.jobId,'');
+  }catch(e){/* no jobs yet — user can search instead */}
+}
 async function loadById(){
   const id=document.getElementById('jobId').value.trim();
   if(!id){showError('Enter a jobId first');return;}

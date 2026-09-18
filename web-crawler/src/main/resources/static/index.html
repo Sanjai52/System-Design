@@ -172,6 +172,7 @@
                 <span id="jobBadge"></span>
                 <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="stopCrawl()">Stop</button>
             </h2>
+            <div id="jobIdLine" style="font-size:0.8rem;color:#94a3b8;margin-bottom:12px;word-break:break-all"></div>
             <div class="status-bar">
                 <div class="stat">
                     <div class="stat-value" id="statPages">0</div>
@@ -216,6 +217,7 @@
 
                 if (res.ok) {
                     currentJobId = data.jobId;
+                    document.getElementById('jobIdLine').textContent = 'Job ID: ' + data.jobId;
                     document.getElementById('statusCard').classList.remove('hidden');
                     startPolling();
                 }

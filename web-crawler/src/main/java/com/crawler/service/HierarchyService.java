@@ -37,6 +37,12 @@ public class HierarchyService {
         return repository.findJobsBySeedContains(query.trim());
     }
 
+    public java.util.Optional<CrawlJob> getLatestJob() {
+        return repository.getAllJobs().stream()
+                .max(java.util.Comparator.comparing(CrawlJob::getStartTime,
+                        java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())));
+    }
+
     static HierarchyNode buildTreeFrom(String seedUrl, CrawlStatus rootStatus, List<UrlResult> results, int maxDepth) {
         Map<String, UrlResult> byUrl = new HashMap<>();
         for (UrlResult r : results) {

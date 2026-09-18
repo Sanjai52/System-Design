@@ -105,6 +105,13 @@ public class CrawlController {
         }
     }
 
+    @GetMapping("/latest")
+    public ResponseEntity<?> getLatestJob() {
+        return hierarchyService.getLatestJob()
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(404).body(Map.of("error", "No crawl jobs found")));
+    }
+
     @GetMapping("/{jobId}/hierarchy")
     public ResponseEntity<?> getHierarchy(@PathVariable String jobId,
                                           @RequestParam(required = false) Integer maxDepth) {

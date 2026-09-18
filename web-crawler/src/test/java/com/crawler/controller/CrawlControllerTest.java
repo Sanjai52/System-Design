@@ -76,4 +76,23 @@ public class CrawlControllerTest {
         mvc.perform(get("/api/crawl/search").param("seedUrl", " "))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void latestReturnsNewestJob() throws Exception {
+        CrawlJob job = new CrawlJob("j-new", "https://new.test", 10);
+        job.setStatus(CrawlStatus.CRAWLING);
+        when(hierarchyService.getLatestJob()).thenReturn(java.util.Optional.of(job));
+
+        mvc.perform(get("/api/crawl/latest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.jobId").value("j-new"));
+    }
+
+    @Test
+    void latestWithNoJobsIs404() throws Exception {
+        when(hierarchyService.getLatestJob()).thenReturn(java.util.Optional.empty());
+
+        mvc.perform(get("/api/crawl/latest"))
+                .andExpect(status().isNotFound());
+    }
 }
