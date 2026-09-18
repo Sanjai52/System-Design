@@ -6,6 +6,7 @@ import com.crawler.model.CrawlResponse;
 import com.crawler.model.UrlResult;
 import com.crawler.repository.CrawlStateRepository;
 import com.crawler.service.CrawlService;
+import com.crawler.service.HierarchyService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @RestController
 @RequestMapping("/api/crawl")
@@ -22,10 +24,12 @@ public class CrawlController {
 
     private final CrawlService crawlService;
     private final CrawlStateRepository crawlStateRepository;
+    private final HierarchyService hierarchyService;
 
-    public CrawlController(CrawlService crawlService, CrawlStateRepository crawlStateRepository) {
+    public CrawlController(CrawlService crawlService, CrawlStateRepository crawlStateRepository, HierarchyService hierarchyService) {
         this.crawlService = crawlService;
         this.crawlStateRepository = crawlStateRepository;
+        this.hierarchyService = hierarchyService;
     }
 
     @PostMapping
@@ -90,5 +94,31 @@ public class CrawlController {
 
         crawlService.stopCrawl(jobId);
         return ResponseEntity.ok(Map.of("message", "Job stopped", "jobId", jobId));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<?> searchBySeed(@RequestParam String seedUrl) {
+        try {
+            return ResponseEntity.ok(hierarchyService.searchBySeed(seedUrl));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{jobId}/hierarchy")
+    public ResponseEntity<?> getHierarchy(@PathVariable String jobId,
+                                          @RequestParam(required = false) Integer maxDepth) {
+        try {
+            com.crawler.model.HierarchyNode tree = hierarchyService.buildTree(jobId, maxDepth);
+            CrawlJob job = crawlService.getJobStatus(jobId);
+            Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("jobId", jobId);
+            body.put("seedUrl", job != null ? job.getSeedUrl() : null);
+            body.put("status", job != null ? job.getStatus().name() : null);
+            body.put("tree", tree);
+            return ResponseEntity.ok(body);
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }
