@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crawl Hierarchy</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100vh}
+.container{max-width:1000px;margin:0 auto;padding:32px 20px}
+a{color:#93c5fd}
+header{display:flex;align-items:baseline;gap:16px;margin-bottom:20px}
+header h1{font-size:1.6rem;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.card{background:rgba(30,30,60,.6);border:1px solid rgba(59,130,246,.15);border-radius:12px;padding:20px;margin-bottom:20px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input{flex:1;min-width:180px;padding:9px 12px;background:rgba(15,15,35,.8);border:1px solid rgba(59,130,246,.2);border-radius:8px;color:#e0e0e0}
+button{padding:9px 18px;border:none;border-radius:8px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff}
+button.ghost{background:rgba(59,130,246,.15);color:#bfdbfe}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:.8rem;color:#94a3b8}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase}
+.s-QUEUED{background:rgba(251,191,36,.15);color:#fbbf24}.s-CRAWLING{background:rgba(59,130,246,.15);color:#60a5fa}.s-COMPLETED{background:rgba(34,197,94,.15);color:#4ade80}.s-FAILED{background:rgba(239,68,68,.15);color:#f87171}.s-DISCOVERED{background:rgba(148,163,184,.15);color:#cbd5e1}
+ul.tree{list-style:none;margin-top:12px}
+ul.tree ul{margin-left:22px;border-left:1px solid rgba(59,130,246,.25);padding-left:14px}
+.node{margin:6px 0}
+.toggle{cursor:pointer;user-select:none;margin-right:6px;color:#93c5fd;font-weight:700}
+.leaf{display:inline-block;width:14px;margin-right:6px;color:#475569}
+.url{word-break:break-all}
+.meta{font-size:.75rem;color:#94a3b8;margin-left:8px}
+.visited{font-size:.72rem;color:#fbbf24;border:1px solid rgba(251,191,36,.4);border-radius:10px;padding:0 8px;margin-left:8px}
+#error{color:#f87171;margin-top:8px;min-height:1.2em}
+.results{margin-top:10px;font-size:.85rem}
+.results div{padding:6px 8px;border-bottom:1px solid rgba(59,130,246,.12);cursor:pointer}
+.results div:hover{background:rgba(59,130,246,.08)}
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>Crawl Hierarchy</h1><a href="/">← back to crawler</a></header>
+<div class="card">
+<div class="row">
+<input id="jobId" placeholder="jobId (e.g. d4fbe0b3-…)">
+<input id="seed" placeholder="or search seedUrl contains… (e.g. example)">
+<input id="depth" type="number" min="1" max="20" placeholder="maxDepth" style="flex:0 0 110px">
+<button onclick="loadById()">Load tree</button>
+<button class="ghost" onclick="searchSeed()">Search</button>
+</div>
+<div class="row" style="margin-top:10px">
+<button class="ghost" onclick="expandAll(true)">Expand all</button>
+<button class="ghost" onclick="expandAll(false)">Collapse all</button>
+<span id="counts" style="align-self:center;color:#94a3b8;font-size:.85rem"></span>
+</div>
+<div class="legend"><span><span class="badge s-COMPLETED">completed</span> done</span><span><span class="badge s-CRAWLING">crawling</span> active</span><span><span class="badge s-FAILED">failed</span> error</span><span><span class="badge s-QUEUED">queued</span> waiting</span><span class="visited">already visited</span> cycle ref (not expanded)</div>
+<div id="error"></div>
+<div id="searchResults" class="results"></div>
+</div>
+<div class="card"><div id="treeWrap"><p style="color:#64748b">Enter a jobId or search by seed URL to visualise the discovery tree.</p></div></div>
+</div>
+<script>
+let total=0;
+async function loadById(){
+  const id=document.getElementById('jobId').value.trim();
+  if(!id){showError('Enter a jobId first');return;}
+  const d=document.getElementById('depth').value.trim();
+  await loadTree(id,d?`?maxDepth=${encodeURIComponent(d)}`:'');
+}
+async function searchSeed(){
+  const q=document.getElementById('seed').value.trim();
+  if(!q){showError('Enter seed text to search');return;}
+  showError('');
+  const res=await fetch(`/api/crawl/search?seedUrl=${encodeURIComponent(q)}`);
+  if(!res.ok){showError('Search failed: '+res.status);return;}
+  const jobs=await res.json();
+  const box=document.getElementById('searchResults');
+  if(!jobs.length){box.innerHTML='<p style="color:#64748b">No jobs match "'+escapeHtml(q)+'"</p>';return;}
+  box.innerHTML=jobs.map(j=>`<div data-id="${j.jobId}"><span class="badge s-${j.status}">${j.status}</span> <b>${escapeHtml(j.seedUrl||'')}</b> <span class="meta">${j.pagesCrawled}/${j.maxPages} pages · ${j.jobId}</span></div>`).join('');
+  box.querySelectorAll('div[data-id]').forEach(el=>el.onclick=()=>{document.getElementById('jobId').value=el.dataset.id;loadTree(el.dataset.id,'');});
+}
+async function loadTree(id,qs){
+  showError('');document.getElementById('searchResults').innerHTML='';
+  const res=await fetch(`/api/crawl/${id}/hierarchy${qs}`);
+  if(res.status===404){showError('Job not found: '+id);return;}
+  if(!res.ok){showError('Failed to load hierarchy: '+res.status);return;}
+  const data=await res.json();
+  total=0;countNodes(data.tree);
+  document.getElementById('counts').textContent=`${total} nodes · seed ${data.seedUrl||''} · ${data.status||''}`;
+  document.getElementById('treeWrap').innerHTML=renderNode(data.tree,true);
+  bindToggles();
+}
+function countNodes(n){if(!n)return;total++;(n.children||[]).forEach(countNodes);}
+function renderNode(n,isRoot){
+  const kids=n.children||[];
+  const has=kids.length>0;
+  const caret=has?`<span class="toggle" data-open="true">▾</span>`:`<span class="leaf">•</span>`;
+  const visited=n.alreadyVisited?`<span class="visited">already visited</span>`:'';
+  let h=`<li class="node">${caret}<span class="badge s-${n.status}">${n.status}</span> <span class="url">${escapeHtml(n.url)}</span><span class="meta">d${n.depth} · ${n.discoveredLinks} links</span>${visited}`;
+  if(has){h+=`<ul>${kids.map(k=>renderNode(k,false)).join('')}</ul>`;}
+  return h+'</li>';
+}
+function bindToggles(){
+  document.querySelectorAll('.toggle').forEach(t=>{
+    t.onclick=()=>{
+      const open=t.dataset.open==='true';
+      t.dataset.open=open?'false':'true';
+      t.textContent=open?'▸':'▾';
+      const ul=t.parentElement.querySelector(':scope > ul');
+      if(ul)ul.style.display=open?'none':'';
+    };
+  });
+}
+function expandAll(open){
+  document.querySelectorAll('.toggle').forEach(t=>{
+    t.dataset.open=open?'true':'false';t.textContent=open?'▾':'▸';
+    const ul=t.parentElement.querySelector(':scope > ul');
+    if(ul)ul.style.display=open?'':'none';
+  });
+}
+function showError(m){document.getElementById('error').textContent=m;}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+</script>
+</body>
+</html>
