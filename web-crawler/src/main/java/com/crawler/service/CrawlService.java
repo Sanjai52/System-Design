@@ -5,23 +5,26 @@ import com.crawler.model.CrawlJob;
 import com.crawler.model.CrawlStatus;
 import com.crawler.model.CrawlTask;
 import com.crawler.repository.CrawlStateRepository;
+import com.crawler.worker.CrawlJobContext;
 import com.crawler.worker.CrawlWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class CrawlService {
 
     private static final Logger log = LoggerFactory.getLogger(CrawlService.class);
+
+    public record JobHandle(CrawlJobContext context, ExecutorService executor) {}
 
     private final CrawlerConfig config;
     private final QueueService queueService;
@@ -29,8 +32,7 @@ public class CrawlService {
     private final UrlDiscoveryService urlDiscoveryService;
     private final CrawlStateRepository crawlStateRepository;
 
-    private final Map<String, CrawlWorker> activeWorkers = new ConcurrentHashMap<>();
-    private final Map<String, ExecutorService> activeExecutors = new ConcurrentHashMap<>();
+    private final Map<String, JobHandle> activeJobs = new ConcurrentHashMap<>();
 
     public CrawlService(CrawlerConfig config,
                         QueueService queueService,
@@ -47,49 +49,37 @@ public class CrawlService {
     public CrawlJob startCrawl(String seedUrl, int maxPages) {
         String jobId = UUID.randomUUID().toString();
 
-        // Validate seed URL
         if (!urlDiscoveryService.isValidUrl(seedUrl)) {
             throw new IllegalArgumentException("Invalid seed URL: " + seedUrl);
         }
 
-        // Create job
         CrawlJob job = new CrawlJob(jobId, seedUrl, maxPages);
         job.setStatus(CrawlStatus.QUEUED);
         crawlStateRepository.saveJob(job);
 
-        // Clear any previous queue state
-        queueService.clear();
-
-        // Mark seed URL as visited and add to queue
+        int workers = Math.max(1, config.getThreadCount());
+        queueService.createQueue(jobId);
+        CrawlJobContext context = new CrawlJobContext(jobId, maxPages, workers, queueService);
+        context.addTask(new CrawlTask(seedUrl, null, 0));
         crawlStateRepository.markVisited(jobId, seedUrl);
-        queueService.addTask(new CrawlTask(seedUrl, null, 0));
 
-        // Create worker and executor
-        CrawlWorker worker = new CrawlWorker(
-                jobId, maxPages,
-                queueService, pageFetcherService,
-                urlDiscoveryService, crawlStateRepository
-        );
+        ExecutorService executor = Executors.newFixedThreadPool(workers, new CrawlThreadFactory(jobId));
+        activeJobs.put(jobId, new JobHandle(context, executor));
 
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        activeWorkers.put(jobId, worker);
-        activeExecutors.put(jobId, executor);
-
-        // Update status and start
         crawlStateRepository.updateJobStatus(jobId, CrawlStatus.CRAWLING);
 
-        executor.submit(() -> {
-            try {
-                worker.run();
-            } finally {
-                crawlStateRepository.completeJob(jobId);
-                activeWorkers.remove(jobId);
-                activeExecutors.remove(jobId);
-                log.info("Crawl job {} completed", jobId);
-            }
-        });
+        Runnable finishHook = () -> {
+            queueService.removeQueue(jobId);
+            activeJobs.remove(jobId);
+            executor.shutdown();
+            log.info("Crawl job {} completed", jobId);
+        };
+        for (int i = 0; i < workers; i++) {
+            executor.submit(new CrawlWorker(jobId, context, pageFetcherService,
+                    urlDiscoveryService, crawlStateRepository, finishHook));
+        }
 
-        log.info("Started crawl job {} for seed URL: {}", jobId, seedUrl);
+        log.info("Started crawl job {} for seed URL: {} ({} workers)", jobId, seedUrl, workers);
         return job;
     }
 
@@ -98,17 +88,29 @@ public class CrawlService {
     }
 
     public void stopCrawl(String jobId) {
-        CrawlWorker worker = activeWorkers.get(jobId);
-        ExecutorService executor = activeExecutors.get(jobId);
-
-        if (worker != null) {
-            worker.stop();
-        }
-        if (executor != null) {
-            executor.shutdownNow();
+        JobHandle handle = activeJobs.get(jobId);
+        if (handle != null) {
+            handle.context().stop();
+            handle.executor().shutdownNow();
         }
 
         crawlStateRepository.updateJobStatus(jobId, CrawlStatus.COMPLETED);
         log.info("Stopped crawl job: {}", jobId);
+    }
+
+    private static final class CrawlThreadFactory implements ThreadFactory {
+        private final String prefix;
+        private final AtomicInteger counter = new AtomicInteger(0);
+
+        CrawlThreadFactory(String jobId) {
+            this.prefix = "crawl-" + jobId.substring(0, 8) + "-";
+        }
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, prefix + counter.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        }
     }
 }

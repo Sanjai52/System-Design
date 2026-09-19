@@ -22,6 +22,10 @@ public class CrawlStateRepository {
     private static final String VISITED_PREFIX = "crawl:visited:";
     private static final String JOB_PREFIX = "crawl:job:";
     private static final String RESULT_PREFIX = "crawl:result:";
+    private static final String TERM_PREFIX = "index:term:";
+    private static final String DOC_PREFIX = "index:doc:";
+    private static final String DOC_SET = "index:docs";
+    private static final String META_KEY = "index:meta";
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -192,6 +196,61 @@ public class CrawlStateRepository {
         return getAllJobs().stream()
                 .filter(j -> j.getSeedUrl() != null && j.getSeedUrl().toLowerCase().contains(q))
                 .collect(java.util.stream.Collectors.toList());
+    }
+
+    public void indexPage(String url, String jobId, String title, String snippet, int length,
+                      java.util.Map<String, Integer> tf) {
+        if (url == null || url.isBlank() || tf == null || tf.isEmpty()) return;
+        for (java.util.Map.Entry<String, Integer> e : tf.entrySet()) {
+            redisTemplate.opsForZSet().add(TERM_PREFIX + e.getKey(), url, e.getValue().doubleValue());
+        }
+        String docKey = DOC_PREFIX + generateUrlKey(url);
+        java.util.Map<String, String> doc = new java.util.HashMap<>();
+        doc.put("url", url);
+        doc.put("title", title != null ? title : "");
+        doc.put("snippet", snippet != null ? snippet : "");
+        doc.put("length", String.valueOf(length));
+        doc.put("jobId", jobId != null ? jobId : "");
+        redisTemplate.opsForHash().putAll(docKey, doc);
+        Long added = redisTemplate.opsForSet().add(DOC_SET, url);
+        if (added != null && added > 0) {
+            redisTemplate.opsForHash().increment(META_KEY, "totalDocs", 1);
+        }
+    }
+
+    public java.util.Map<String, Double> getTermScores(String token) {
+        java.util.Set<org.springframework.data.redis.core.ZSetOperations.TypedTuple<Object>> tuples =
+                redisTemplate.opsForZSet().rangeWithScores(TERM_PREFIX + token, 0, -1);
+        java.util.Map<String, Double> out = new java.util.HashMap<>();
+        if (tuples == null) return out;
+        for (org.springframework.data.redis.core.ZSetOperations.TypedTuple<Object> t : tuples) {
+            if (t.getValue() != null && t.getScore() != null) out.put(t.getValue().toString(), t.getScore());
+        }
+        return out;
+    }
+
+    public long getTermDocCount(String token) {
+        Long n = redisTemplate.opsForZSet().zCard(TERM_PREFIX + token);
+        return n != null ? n : 0;
+    }
+
+    public long getTotalDocs() {
+        Object v = redisTemplate.opsForHash().get(META_KEY, "totalDocs");
+        if (v == null) return 0;
+        try {
+            return Long.parseLong(v.toString());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    public java.util.Map<String, String> getDoc(String url) {
+        java.util.Map<Object, Object> raw = redisTemplate.opsForHash().entries(DOC_PREFIX + generateUrlKey(url));
+        java.util.Map<String, String> out = new java.util.HashMap<>();
+        for (java.util.Map.Entry<Object, Object> e : raw.entrySet()) {
+            out.put(e.getKey().toString(), e.getValue() != null ? e.getValue().toString() : "");
+        }
+        return out;
     }
 
     private String generateUrlKey(String url) {
