@@ -1,5 +1,6 @@
 package com.crawler.service;
 
+import com.crawler.config.SearchConfig;
 import com.crawler.model.SearchHit;
 import com.crawler.repository.CrawlStateRepository;
 import org.springframework.stereotype.Service;
@@ -17,9 +18,11 @@ public class RankService {
     public static final int MAX_LIMIT = 50;
 
     private final CrawlStateRepository repository;
+    private final SearchConfig searchConfig;
 
-    public RankService(CrawlStateRepository repository) {
+    public RankService(CrawlStateRepository repository, SearchConfig searchConfig) {
         this.repository = repository;
+        this.searchConfig = searchConfig;
     }
 
     public List<SearchHit> search(String query, Integer limit) {
@@ -47,7 +50,8 @@ public class RankService {
                 });
             }
         }
-        return combineScores(postings, docLen, totalDocs, df, n, repository);
+        return combineScores(postings, docLen, totalDocs, df, n, repository,
+                searchConfig.getTfidfWeight(), searchConfig.getPagerankWeight());
     }
 
     static List<SearchHit> combineScores(Map<String, Map<String, Double>> postings,
@@ -55,7 +59,9 @@ public class RankService {
                                          long totalDocs,
                                          Map<String, Long> df,
                                          int limit,
-                                         CrawlStateRepository repository) {
+                                         CrawlStateRepository repository,
+                                         double tfidfWeight,
+                                         double pagerankWeight) {
         Map<String, Double> idf = new HashMap<>();
         boolean anyIdf = false;
         for (String t : postings.keySet()) {
@@ -70,7 +76,8 @@ public class RankService {
                 String url = e.getKey();
                 double tf = e.getValue() / Math.max(1, docLen.getOrDefault(url, 1));
                 double w = anyIdf ? idf.get(t) : 1.0;
-                agg.merge(url, tf * w, Double::sum);
+                double pr = repository.getPageRank(url);
+                agg.merge(url, tfidfWeight * tf * w + pagerankWeight * pr, Double::sum);
             }
         }
         List<String> ranked = new ArrayList<>(agg.keySet());

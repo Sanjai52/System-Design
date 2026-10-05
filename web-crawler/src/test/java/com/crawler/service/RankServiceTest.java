@@ -1,10 +1,11 @@
 package com.crawler.service;
 
+import com.crawler.config.SearchConfig;
 import com.crawler.model.SearchHit;
 import com.crawler.repository.CrawlStateRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -20,8 +21,12 @@ public class RankServiceTest {
     @Mock
     CrawlStateRepository repo;
 
-    @InjectMocks
     RankService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new RankService(repo, new SearchConfig());
+    }
 
     @Test
     void higherTfRanksFirstWhenIdfZero() {
@@ -66,5 +71,22 @@ public class RankServiceTest {
     @Test
     void blankQueryRejected() {
         assertThrows(IllegalArgumentException.class, () -> service.search("  ", 10));
+    }
+
+    @Test
+    void higherPageRankBreaksTfTie() {
+        when(repo.getTotalDocs()).thenReturn(2L);
+        when(repo.getTermScores("example")).thenReturn(Map.of(
+                "https://a.test", 1.0, "https://b.test", 1.0));
+        when(repo.getTermDocCount("example")).thenReturn(2L);
+        when(repo.getDoc("https://a.test")).thenReturn(Map.of("title", "A", "snippet", "s", "length", "10"));
+        when(repo.getDoc("https://b.test")).thenReturn(Map.of("title", "B", "snippet", "s", "length", "10"));
+        when(repo.getPageRank("https://a.test")).thenReturn(0.1);
+        when(repo.getPageRank("https://b.test")).thenReturn(0.5);
+
+        List<SearchHit> hits = service.search("example", 10);
+
+        assertEquals(2, hits.size());
+        assertEquals("https://b.test", hits.get(0).getUrl());
     }
 }

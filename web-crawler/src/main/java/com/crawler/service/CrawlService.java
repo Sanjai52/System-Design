@@ -28,6 +28,7 @@ public class CrawlService {
 
     private final CrawlerConfig config;
     private final QueueService queueService;
+    private final PageRankService pageRankService;
     private final PageFetcherService pageFetcherService;
     private final UrlDiscoveryService urlDiscoveryService;
     private final CrawlStateRepository crawlStateRepository;
@@ -36,11 +37,13 @@ public class CrawlService {
 
     public CrawlService(CrawlerConfig config,
                         QueueService queueService,
+                        PageRankService pageRankService,
                         PageFetcherService pageFetcherService,
                         UrlDiscoveryService urlDiscoveryService,
                         CrawlStateRepository crawlStateRepository) {
         this.config = config;
         this.queueService = queueService;
+        this.pageRankService = pageRankService;
         this.pageFetcherService = pageFetcherService;
         this.urlDiscoveryService = urlDiscoveryService;
         this.crawlStateRepository = crawlStateRepository;
@@ -72,6 +75,12 @@ public class CrawlService {
             queueService.removeQueue(jobId);
             activeJobs.remove(jobId);
             executor.shutdown();
+            try {
+                int ranked = pageRankService.recomputeAll();
+                log.info("PageRank recomputed over {} urls after job {}", ranked, jobId);
+            } catch (Exception e) {
+                log.warn("PageRank recompute failed after job {}: {}", jobId, e.getMessage());
+            }
             log.info("Crawl job {} completed", jobId);
         };
         for (int i = 0; i < workers; i++) {

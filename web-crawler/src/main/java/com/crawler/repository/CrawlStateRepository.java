@@ -26,6 +26,7 @@ public class CrawlStateRepository {
     private static final String DOC_PREFIX = "index:doc:";
     private static final String DOC_SET = "index:docs";
     private static final String META_KEY = "index:meta";
+    private static final String RANK_KEY = "rank:pagerank";
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     private final RedisTemplate<String, Object> redisTemplate;
@@ -255,5 +256,19 @@ public class CrawlStateRepository {
 
     private String generateUrlKey(String url) {
         return String.valueOf(url.hashCode());
+    }
+
+    public void savePageRanks(java.util.Map<String, Double> ranks) {
+        if (ranks == null || ranks.isEmpty()) return;
+        for (java.util.Map.Entry<String, Double> e : ranks.entrySet()) {
+            if (e.getKey() == null || e.getValue() == null) continue;
+            redisTemplate.opsForZSet().add(RANK_KEY, e.getKey(), e.getValue());
+        }
+    }
+
+    public double getPageRank(String url) {
+        if (url == null) return 0.0;
+        Double s = redisTemplate.opsForZSet().score(RANK_KEY, url);
+        return s != null ? s : 0.0;
     }
 }
