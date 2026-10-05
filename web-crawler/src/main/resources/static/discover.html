@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Discovery</title>
+<style>
+:root{
+  --bg:#f7f5f1; --surface:#fff; --ink:#292524; --muted:#78716c; --faint:#a8a29e;
+  --line:#e9e2d5; --accent:#0f766e; --accent-dark:#115e59; --focus-ring:rgba(15,118,110,.15);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.container{max-width:760px;margin:0 auto;padding:48px 20px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+header{margin-bottom:28px}
+header h1{font-family:Georgia,'Times New Roman',serif;font-size:1.7rem;font-weight:500;margin-bottom:6px}
+header p{color:var(--muted);font-size:.9rem}
+header nav{font-size:.9rem;color:var(--faint);margin-top:12px}
+header nav a{margin:0 4px}
+header nav a:first-child{margin-left:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px;box-shadow:0 1px 2px rgba(41,37,36,.04)}
+.card h2{font-family:Georgia,'Times New Roman',serif;font-size:1.15rem;font-weight:500;margin-bottom:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:6px}
+.field{margin-bottom:12px}
+.field input,.field select{width:100%;padding:9px 12px;background:var(--surface);border:1px solid var(--line);border-radius:7px;color:var(--ink);font-size:.9rem;outline:none}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--focus-ring)}
+button{padding:9px 18px;border:none;border-radius:7px;font-size:.88rem;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+button:hover{background:var(--accent-dark)}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.ghost:hover{background:#f0ede6}
+.hit{padding:12px 4px;border-bottom:1px solid var(--line)}
+.hit .title{font-size:1rem;font-weight:600}
+.hit .url{font-size:.78rem;color:var(--faint);word-break:break-all}
+.hit .snippet{font-size:.85rem;color:#57534e;margin-top:4px;line-height:1.5}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:600;background:#ccfbf1;color:#0f766e;margin-left:8px}
+#error{color:#b45349;margin-top:8px;min-height:1.2em;font-size:.88rem}
+.meta{font-size:.85rem;color:var(--muted);margin-top:8px}
+#readerText{white-space:pre-wrap;font-size:.9rem;line-height:1.65;color:#44403c;margin-top:10px;max-height:60vh;overflow-y:auto}
+#readerTitle{font-family:Georgia,'Times New Roman',serif;font-size:1.25rem;font-weight:500}
+#readerUrl{font-size:.78rem;color:var(--faint);word-break:break-all;margin-top:2px}
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>Content discovery</h1><p>Search a keyword across a page and the pages it links to.</p><nav><a href="/">Crawler</a> · <a href="/hierarchy.html">Hierarchy</a> · <a href="/search.html">Search pages</a></nav></header>
+<div class="card">
+<h2>Find keyword</h2>
+<div class="field"><label>Page URL</label><input id="url" placeholder="https://example.com"></div>
+<div class="row">
+<div class="field" style="flex:1;min-width:180px"><label>Keyword</label><input id="keyword" placeholder="e.g. domain" onkeydown="if(event.key==='Enter')doDiscover()"></div>
+<div class="field" style="flex:0 0 120px"><label>Link depth</label><select id="depth"><option value="1">1 level</option><option value="2">2 levels</option><option value="3">3 levels</option></select></div>
+<div class="field" style="flex:0 0 auto;align-self:flex-end"><button onclick="doDiscover()">Discover</button></div>
+</div>
+<div id="error"></div>
+<div id="meta" class="meta"></div>
+<div id="results"></div>
+</div>
+<div class="card" id="readerCard" style="display:none">
+<h2 id="readerTitle"></h2>
+<div id="readerUrl"></div>
+<div id="readerText"></div>
+</div>
+</div>
+<script>
+async function doDiscover(){
+  const url=document.getElementById('url').value.trim();
+  const keyword=document.getElementById('keyword').value.trim();
+  const depth=parseInt(document.getElementById('depth').value)||1;
+  const err=document.getElementById('error');
+  const box=document.getElementById('results');
+  const meta=document.getElementById('meta');
+  err.textContent='';box.innerHTML='';meta.textContent='';
+  document.getElementById('readerCard').style.display='none';
+  if(!url||!keyword){err.textContent='Enter both a URL and a keyword';return;}
+  err.textContent='Searching…';
+  const res=await fetch('/api/discover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,keyword,depth})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));err.textContent=e.error||('Search failed: '+res.status);return;}
+  err.textContent='';
+  const hits=await res.json();
+  if(!hits.length){meta.textContent=`No pages under "${url}" mention "${keyword}" (depth ${depth}).`;return;}
+  meta.textContent=`${hits.length} page(s) mention "${keyword}"`;
+  box.innerHTML=hits.map((h,i)=>`<div class="hit"><span class="title">${escapeHtml(h.title||h.url)}</span><span class="badge">${h.matchCount} × · depth ${h.depth}</span><div class="url">${escapeHtml(h.url)}</div><div class="snippet">${escapeHtml(h.snippet||'')}</div><div style="margin-top:6px"><button class="ghost" onclick="viewFull(${i})">View full content</button></div></div>`).join('');
+  window._hits=hits;
+}
+async function viewFull(i){
+  const h=(window._hits||[])[i];
+  if(!h)return;
+  const res=await fetch(`/api/discover/content?url=${encodeURIComponent(h.url)}`);
+  if(!res.ok){document.getElementById('error').textContent='Could not load full content: '+res.status;return;}
+  const page=await res.json();
+  document.getElementById('readerTitle').textContent=page.title||page.url;
+  document.getElementById('readerUrl').textContent=page.url;
+  document.getElementById('readerText').textContent=page.text||'(no readable text)';
+  const card=document.getElementById('readerCard');
+  card.style.display='';
+  card.scrollIntoView({behavior:'smooth'});
+}
+function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+</script>
+</body>
+</html>
