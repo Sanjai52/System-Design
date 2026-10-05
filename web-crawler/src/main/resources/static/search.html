@@ -59,7 +59,7 @@ async function doSearch(){
   if(!res.ok){err.textContent='Search failed: '+res.status;return;}
   const hits=await res.json();
   if(!hits.length){meta.textContent=`No pages match "${q}" yet — run a crawl first.`;return;}
-  meta.textContent=`${hits.length} result(s) for "${q}" (ranked by TF-IDF)`;
+  meta.textContent=`${hits.length} result(s) for "${q}"`;
   box.innerHTML=hits.map(h=>`<div class="hit"><span class="title"><a href="${escapeAttr(h.url)}" target="_blank" rel="noopener">${escapeHtml(h.title||h.url)}</a></span><span class="badge">${Number(h.score).toFixed(4)}</span><div class="url">${escapeHtml(h.url)}</div><div class="snippet">${escapeHtml(h.snippet||'')}</div></div>`).join('');
 }
 function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
