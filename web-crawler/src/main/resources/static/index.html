@@ -5,126 +5,103 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Crawler</title>
     <style>
+        :root {
+            --bg: #f7f5f1;
+            --surface: #ffffff;
+            --ink: #292524;
+            --muted: #78716c;
+            --faint: #a8a29e;
+            --line: #e9e2d5;
+            --accent: #0f766e;
+            --accent-dark: #115e59;
+            --danger: #b45349;
+            --danger-dark: #9a463e;
+            --focus-ring: rgba(15, 118, 110, 0.15);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: #0f0f23;
-            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--ink);
             min-height: 100vh;
-            overflow-x: hidden;
-        }
-        .bg-grid {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background-image:
-                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
-            background-size: 50px 50px;
-            pointer-events: none; z-index: 0;
-        }
-        .bg-glow {
-            position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
-            width: 600px; height: 600px;
-            background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
-            pointer-events: none; z-index: 0;
-            animation: pulse 8s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: translateX(-50%) scale(1); }
-            50% { opacity: 1; transform: translateX(-50%) scale(1.1); }
         }
         .container {
-            position: relative; z-index: 1;
-            max-width: 900px; margin: 0 auto; padding: 40px 20px;
+            max-width: 760px; margin: 0 auto; padding: 48px 20px;
         }
-        header { text-align: center; margin-bottom: 40px; }
+        header { margin-bottom: 32px; }
         h1 {
-            font-size: 2rem; font-weight: 700;
-            background: linear-gradient(135deg, #60a5fa, #a78bfa);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-bottom: 8px;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 1.9rem; font-weight: 500; color: var(--ink);
+            margin-bottom: 6px;
         }
-        .subtitle { color: #94a3b8; font-size: 0.95rem; }
+        .subtitle { color: var(--muted); font-size: 0.95rem; }
+        nav { margin-top: 14px; font-size: 0.9rem; }
+        nav a { color: var(--accent); text-decoration: none; }
+        nav a:hover { text-decoration: underline; }
+        nav span { color: var(--faint); margin: 0 8px; }
         .card {
-            background: rgba(30, 30, 60, 0.6);
-            border: 1px solid rgba(59,130,246,0.15);
-            border-radius: 12px; padding: 28px;
-            backdrop-filter: blur(10px);
-            margin-bottom: 24px;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        .card:hover {
-            border-color: rgba(59,130,246,0.35);
-            box-shadow: 0 0 20px rgba(59,130,246,0.08);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 10px; padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 2px rgba(41, 37, 36, 0.04);
         }
         .card h2 {
-            font-size: 1.1rem; color: #93c5fd; margin-bottom: 16px;
+            font-family: Georgia, 'Times New Roman', serif;
+            font-size: 1.15rem; font-weight: 500; color: var(--ink);
+            margin-bottom: 16px;
             display: flex; align-items: center; gap: 8px;
         }
         .input-group { margin-bottom: 16px; }
         .input-group label {
-            display: block; font-size: 0.85rem; color: #94a3b8;
+            display: block; font-size: 0.85rem; color: var(--muted);
             margin-bottom: 6px;
         }
         .input-group input, .input-group select {
-            width: 100%; padding: 10px 14px;
-            background: rgba(15,15,35,0.8);
-            border: 1px solid rgba(59,130,246,0.2);
-            border-radius: 8px; color: #e0e0e0;
+            width: 100%; padding: 9px 12px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 7px; color: var(--ink);
             font-size: 0.95rem; outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
         }
         .input-group input:focus, .input-group select:focus {
-            border-color: #60a5fa;
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--focus-ring);
         }
         .btn {
-            padding: 10px 24px; border: none; border-radius: 8px;
-            font-size: 0.95rem; font-weight: 600; cursor: pointer;
-            transition: all 0.2s; position: relative; overflow: hidden;
+            padding: 9px 20px; border: none; border-radius: 7px;
+            font-size: 0.9rem; font-weight: 600; cursor: pointer;
+            text-decoration: none; display: inline-block;
         }
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-            color: white;
-        }
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(59,130,246,0.4);
-        }
-        .btn-primary:active { transform: translateY(0); }
-        .btn-danger {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-        }
-        .btn-danger:hover {
-            box-shadow: 0 4px 15px rgba(239,68,68,0.3);
-        }
-        .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-danger { background: var(--danger); color: #fff; }
+        .btn-danger:hover { background: var(--danger-dark); }
+        .btn-sm { padding: 5px 12px; font-size: 0.8rem; }
         .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
         .row .input-group { flex: 1; min-width: 120px; }
         .status-bar {
-            display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px;
+            display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
         }
         .stat {
-            flex: 1; min-width: 100px; text-align: center; padding: 14px;
-            background: rgba(15,15,35,0.6); border-radius: 8px;
-            border: 1px solid rgba(59,130,246,0.1);
+            flex: 1; min-width: 100px; text-align: center; padding: 12px;
+            background: var(--bg); border-radius: 7px;
+            border: 1px solid var(--line);
         }
-        .stat-value {
-            font-size: 1.5rem; font-weight: 700;
-            color: #60a5fa;
-        }
-        .stat-label { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+        .stat-value { font-size: 1.4rem; font-weight: 600; color: var(--ink); }
+        .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
         .status-badge {
-            display: inline-block; padding: 3px 10px; border-radius: 20px;
-            font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+            display: inline-block; padding: 2px 10px; border-radius: 20px;
+            font-size: 0.72rem; font-weight: 600;
         }
-        .status-QUEUED { background: rgba(251,191,36,0.15); color: #fbbf24; }
-        .status-CRAWLING { background: rgba(59,130,246,0.15); color: #60a5fa; }
-        .status-COMPLETED { background: rgba(34,197,94,0.15); color: #4ade80; }
-        .status-FAILED { background: rgba(239,68,68,0.15); color: #f87171; }
+        .status-QUEUED { background: #fef3c7; color: #92400e; }
+        .status-CRAWLING { background: #ccfbf1; color: #0f766e; }
+        .status-COMPLETED { background: #dcfce7; color: #15803d; }
+        .status-FAILED { background: #fee2e2; color: #b91c1c; }
+        #jobIdLine { font-size: 0.8rem; color: var(--muted); margin-bottom: 12px; word-break: break-all; }
         .spinner {
             display: inline-block; width: 14px; height: 14px;
-            border: 2px solid rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.4);
             border-top-color: white; border-radius: 50%;
             animation: spin 0.6s linear infinite;
         }
@@ -133,25 +110,17 @@
     </style>
 </head>
 <body>
-    <div class="bg-grid"></div>
-    <div class="bg-glow"></div>
-
     <div class="container">
         <header>
             <h1>Web Crawler</h1>
             <p class="subtitle">BFS-based web crawler with Redis state management</p>
-            <p style="margin-top:12px">
-                <a class="btn btn-primary" href="/hierarchy.html" style="text-decoration:none;display:inline-block">
-                    View Hierarchy
-                </a>
-                <a class="btn btn-primary" href="/search.html" style="text-decoration:none;display:inline-block;margin-left:8px">
-                    Search Pages
-                </a>
-            </p>
+            <nav>
+                <a href="/hierarchy.html">Hierarchy</a><span>·</span><a href="/search.html">Search pages</a>
+            </nav>
         </header>
 
         <div class="card">
-            <h2>Start New Crawl</h2>
+            <h2>Start new crawl</h2>
             <div class="input-group">
                 <label>Seed URL</label>
                 <input type="text" id="seedUrl" placeholder="https://example.com" value="https://example.com">
@@ -163,7 +132,7 @@
                 </div>
                 <div class="input-group" style="flex:0 0 auto">
                     <button class="btn btn-primary" id="startBtn" onclick="startCrawl()">
-                        Start Crawl
+                        Start crawl
                     </button>
                 </div>
             </div>
@@ -171,26 +140,26 @@
 
         <div class="card hidden" id="statusCard">
             <h2>
-                Crawl Status
+                Crawl status
                 <span id="jobBadge"></span>
                 <button class="btn btn-danger btn-sm" style="margin-left:auto" onclick="stopCrawl()">Stop</button>
             </h2>
-            <div id="jobIdLine" style="font-size:0.8rem;color:#94a3b8;margin-bottom:12px;word-break:break-all"></div>
+            <div id="jobIdLine"></div>
             <div class="status-bar">
                 <div class="stat">
                     <div class="stat-value" id="statPages">0</div>
-                    <div class="stat-label">Pages Crawled</div>
+                    <div class="stat-label">Pages crawled</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="statDiscovered">0</div>
-                    <div class="stat-label">URLs Discovered</div>
+                    <div class="stat-label">URLs discovered</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="statVisited">0</div>
                     <div class="stat-label">Results</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="statFailed" style="color:#f87171">0</div>
+                    <div class="stat-value" id="statFailed" style="color:#b91c1c">0</div>
                     <div class="stat-label">Failed</div>
                 </div>
             </div>
@@ -226,7 +195,7 @@
                 }
             } catch (e) { /* ignore connection errors */ }
 
-            document.getElementById('startBtn').innerHTML = 'Start Crawl';
+            document.getElementById('startBtn').innerHTML = 'Start crawl';
         }
 
         async function stopCrawl() {

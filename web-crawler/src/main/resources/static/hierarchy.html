@@ -5,56 +5,70 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Crawl Hierarchy</title>
 <style>
+:root{
+  --bg:#f7f5f1; --surface:#fff; --ink:#292524; --muted:#78716c; --faint:#a8a29e;
+  --line:#e9e2d5; --accent:#0f766e; --accent-dark:#115e59; --focus-ring:rgba(15,118,110,.15);
+}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f0f23;color:#e0e0e0;min-height:100vh}
-.container{max-width:1000px;margin:0 auto;padding:32px 20px}
-a{color:#93c5fd}
-header{display:flex;align-items:baseline;gap:16px;margin-bottom:20px}
-header h1{font-size:1.6rem;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.card{background:rgba(30,30,60,.6);border:1px solid rgba(59,130,246,.15);border-radius:12px;padding:20px;margin-bottom:20px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+.container{max-width:860px;margin:0 auto;padding:48px 20px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+header{margin-bottom:28px}
+header h1{font-family:Georgia,'Times New Roman',serif;font-size:1.7rem;font-weight:500;margin-bottom:6px}
+header nav{font-size:.9rem;color:var(--faint)}
+header nav a{margin:0 4px}
+header nav a:first-child{margin-left:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin-bottom:20px;box-shadow:0 1px 2px rgba(41,37,36,.04)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
-input{flex:1;min-width:180px;padding:9px 12px;background:rgba(15,15,35,.8);border:1px solid rgba(59,130,246,.2);border-radius:8px;color:#e0e0e0}
-button{padding:9px 18px;border:none;border-radius:8px;font-weight:600;cursor:pointer;background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff}
-button.ghost{background:rgba(59,130,246,.15);color:#bfdbfe}
-.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:.8rem;color:#94a3b8}
-.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;text-transform:uppercase}
-.s-QUEUED{background:rgba(251,191,36,.15);color:#fbbf24}.s-CRAWLING{background:rgba(59,130,246,.15);color:#60a5fa}.s-COMPLETED{background:rgba(34,197,94,.15);color:#4ade80}.s-FAILED{background:rgba(239,68,68,.15);color:#f87171}.s-DISCOVERED{background:rgba(148,163,184,.15);color:#cbd5e1}
+input{flex:1;min-width:180px;padding:9px 12px;background:var(--surface);border:1px solid var(--line);border-radius:7px;color:var(--ink);font-size:.9rem;outline:none}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--focus-ring)}
+button{padding:9px 18px;border:none;border-radius:7px;font-size:.88rem;font-weight:600;cursor:pointer;background:var(--accent);color:#fff}
+button:hover{background:var(--accent-dark)}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line)}
+button.ghost:hover{background:#f0ede6;border-color:#d6cfbf}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px;font-size:.8rem;color:var(--muted)}
+.badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:600}
+.s-QUEUED{background:#fef3c7;color:#92400e}.s-CRAWLING{background:#ccfbf1;color:#0f766e}.s-COMPLETED{background:#dcfce7;color:#15803d}.s-FAILED{background:#fee2e2;color:#b91c1c}.s-DISCOVERED{background:#e7e5e4;color:#57534e}
 ul.tree{list-style:none;margin-top:12px}
-ul.tree ul{margin-left:22px;border-left:1px solid rgba(59,130,246,.25);padding-left:14px}
-.node{margin:6px 0}
-.toggle{cursor:pointer;user-select:none;margin-right:6px;color:#93c5fd;font-weight:700}
-.leaf{display:inline-block;width:14px;margin-right:6px;color:#475569}
+ul.tree ul{margin-left:20px;border-left:1px solid var(--line);padding-left:14px}
+.node{margin:6px 0;font-size:.9rem}
+.toggle{cursor:pointer;user-select:none;margin-right:6px;color:var(--accent);font-weight:700}
+.leaf{display:inline-block;width:14px;margin-right:6px;color:var(--faint)}
 .url{word-break:break-all}
-.meta{font-size:.75rem;color:#94a3b8;margin-left:8px}
-.visited{font-size:.72rem;color:#fbbf24;border:1px solid rgba(251,191,36,.4);border-radius:10px;padding:0 8px;margin-left:8px}
-#error{color:#f87171;margin-top:8px;min-height:1.2em}
+.meta{font-size:.75rem;color:var(--muted);margin-left:8px}
+.visited{font-size:.7rem;color:#92400e;border:1px solid #f0dca8;border-radius:10px;padding:0 8px;margin-left:8px;background:#fffbeb}
+#latestLine{margin-top:10px;font-size:.85rem;color:var(--muted)}
+#error{color:#b45349;margin-top:8px;min-height:1.2em;font-size:.88rem}
+#counts{color:var(--muted);font-size:.85rem}
 .results{margin-top:10px;font-size:.85rem}
-.results div{padding:6px 8px;border-bottom:1px solid rgba(59,130,246,.12);cursor:pointer}
-.results div:hover{background:rgba(59,130,246,.08)}
+.results div{padding:7px 8px;border-bottom:1px solid var(--line);cursor:pointer;border-radius:4px}
+.results div:hover{background:#f0ede6}
+p.empty{color:var(--faint)}
 </style>
 </head>
 <body>
 <div class="container">
-<header><h1>Crawl Hierarchy</h1><a href="/">← back to crawler</a></header>
+<header><h1>Crawl hierarchy</h1><nav><a href="/">Crawler</a> · <a href="/search.html">Search pages</a></nav></header>
 <div class="card">
 <div class="row">
-<input id="jobId" placeholder="jobId (e.g. d4fbe0b3-…)">
-<input id="seed" placeholder="or search seedUrl contains… (e.g. example)">
-<input id="depth" type="number" min="1" max="20" placeholder="maxDepth" style="flex:0 0 110px">
+<input id="jobId" placeholder="Job ID (e.g. d4fbe0b3-…)">
+<input id="seed" placeholder="or search seed URL contains… (e.g. example)">
+<input id="depth" type="number" min="1" max="20" placeholder="Max depth" style="flex:0 0 110px">
 <button onclick="loadById()">Load tree</button>
 <button class="ghost" onclick="searchSeed()">Search</button>
 </div>
 <div class="row" style="margin-top:10px">
 <button class="ghost" onclick="expandAll(true)">Expand all</button>
 <button class="ghost" onclick="expandAll(false)">Collapse all</button>
-<span id="counts" style="align-self:center;color:#94a3b8;font-size:.85rem"></span>
+<span id="counts" style="align-self:center"></span>
 </div>
 <div class="legend"><span><span class="badge s-COMPLETED">completed</span> done</span><span><span class="badge s-CRAWLING">crawling</span> active</span><span><span class="badge s-FAILED">failed</span> error</span><span><span class="badge s-QUEUED">queued</span> waiting</span><span class="visited">already visited</span> cycle ref (not expanded)</div>
-<div id="latestLine" style="margin-top:10px;font-size:.85rem;color:#94a3b8"></div>
+<div id="latestLine"></div>
 <div id="error"></div>
 <div id="searchResults" class="results"></div>
 </div>
-<div class="card"><div id="treeWrap"><p style="color:#64748b">Enter a jobId or search by seed URL to visualise the discovery tree.</p></div></div>
+<div class="card"><div id="treeWrap"><p class="empty">Enter a job ID or search by seed URL to see the discovery tree.</p></div></div>
 </div>
 <script>
 let total=0;
@@ -84,7 +98,7 @@ async function searchSeed(){
   if(!res.ok){showError('Search failed: '+res.status);return;}
   const jobs=await res.json();
   const box=document.getElementById('searchResults');
-  if(!jobs.length){box.innerHTML='<p style="color:#64748b">No jobs match "'+escapeHtml(q)+'"</p>';return;}
+  if(!jobs.length){box.innerHTML='<p class="empty">No jobs match "'+escapeHtml(q)+'"</p>';return;}
   box.innerHTML=jobs.map(j=>`<div data-id="${j.jobId}"><span class="badge s-${j.status}">${j.status}</span> <b>${escapeHtml(j.seedUrl||'')}</b> <span class="meta">${j.pagesCrawled}/${j.maxPages} pages · ${j.jobId}</span></div>`).join('');
   box.querySelectorAll('div[data-id]').forEach(el=>el.onclick=()=>{document.getElementById('jobId').value=el.dataset.id;loadTree(el.dataset.id,'');});
 }
